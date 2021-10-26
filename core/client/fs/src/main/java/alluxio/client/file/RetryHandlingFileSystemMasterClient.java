@@ -25,6 +25,7 @@ import alluxio.grpc.CreateDirectoryPOptions;
 import alluxio.grpc.CreateDirectoryPRequest;
 import alluxio.grpc.CreateFilePOptions;
 import alluxio.grpc.CreateFilePRequest;
+import alluxio.grpc.DecommissionWorkersPOptions;
 import alluxio.grpc.DeletePOptions;
 import alluxio.grpc.DeletePRequest;
 import alluxio.grpc.FileSystemMasterClientServiceGrpc;
@@ -75,6 +76,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.Consumer;
@@ -382,6 +384,16 @@ public final class RetryHandlingFileSystemMasterClient extends AbstractMasterCli
           .forEach((thread) -> result.add(thread));
       return result;
     }, RPC_LOG, "GetStateLockHolders", "");
+  }
+
+  @Override
+  public void decommissionWorkers(boolean addOnly, final Set<String> excludedWorkerSet)
+      throws AlluxioStatusException {
+    DecommissionWorkersPOptions.Builder optionsBuilder = DecommissionWorkersPOptions.newBuilder();
+    optionsBuilder.setAddOnly(addOnly);
+    retryRPC(() -> mClient.decommissionWorkers(optionsBuilder.addAllExcludedWorkers(
+        excludedWorkerSet.stream().collect(Collectors.toSet())).build()), RPC_LOG,
+        "DecommissionWorkers", "");
   }
 
   /**

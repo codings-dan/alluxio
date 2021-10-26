@@ -65,6 +65,7 @@ import alluxio.proto.meta.Block.BlockMeta;
 import alluxio.resource.CloseableIterator;
 import alluxio.resource.LockResource;
 import alluxio.util.CommonUtils;
+import alluxio.util.ConfigurationUtils;
 import alluxio.util.IdUtils;
 import alluxio.util.executor.ExecutorServiceFactories;
 import alluxio.util.executor.ExecutorServiceFactory;
@@ -238,6 +239,12 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
   private final Map<Long, WorkerRegisterContext> mActiveRegisterContexts =
       new ConcurrentHashMap<>();
 
+  /** Keep track of decommission in progress or decommissioned workers. */
+  private Map<String, MasterWorkerInfo> mExcludedWorkers =
+      new HashMap<>();
+  /** Keep track of decommissioned workers in progress. */
+  private Map<String, MasterWorkerInfo> mTempExcludedWorkers =
+      new HashMap<>();
   /** Listeners to call when lost workers are found. */
   private final List<Consumer<Address>> mLostWorkerFoundListeners
       = new ArrayList<>();
@@ -1001,6 +1008,17 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
     mRegisterLeaseManager.releaseLease(workerId);
   }
 
+  /**
+   * Check whether a worker still in the excluded worker map.
+   * @param worker the worker need to be checked
+   * @return true if a worker still in the excluded worker map
+   *         otherwise false.
+   */
+  private boolean isExcludedWorker(MasterWorkerInfo worker) {
+    String host = worker.getWorkerAddress().getHost();
+    return (mExcludedWorkers.get(host) != null || mTempExcludedWorkers.get(host) != null);
+  }
+
   @Override
   public void workerRegister(long workerId, List<String> storageTiers,
       Map<String, Long> totalBytesOnTiers, Map<String, Long> usedBytesOnTiers,
@@ -1016,6 +1034,11 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
 
     if (worker == null) {
       throw new NotFoundException(ExceptionMessage.NO_WORKER_FOUND.getMessage(workerId));
+    }
+
+    // If this is an excluded worker, do not register any more.
+    if (isExcludedWorker(worker)) {
+      return;
     }
 
     // Gather all blocks on this worker.
@@ -1527,6 +1550,53 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
   @Override
   public void registerNewWorkerConfListener(BiConsumer<Address, List<ConfigProperty>> function) {
     mWorkerRegisteredListeners.add(function);
+  }
+
+  /**
+   * Start decommission process for a specific worker.
+   */
+  private void startDecommission(MasterWorkerInfo worker) {
+    // TODO(bzheng) Handle the state and replicas in excluded workers.
+    try (LockResource r = worker.lockWorkerMeta(
+        EnumSet.of(WorkerMetaLockSection.BLOCKS), false)) {
+      processLostWorker(worker);
+    }
+  }
+
+  /**
+  * Rereads excluded worker conf file and update excluded worker map.
+  */
+  @Override
+  public void decommissionWorkers(final Set<String> excludedWorkerSet, boolean addOnly) {
+    Set<String> excludedHostnames = ConfigurationUtils
+        .getExcludedWorkerHostnames(ServerConfiguration.global());
+    excludedHostnames.addAll(excludedWorkerSet);
+    if (excludedHostnames.isEmpty()) {
+      mExcludedWorkers.clear();
+      LOG.warn("Clear excluded worker map.");
+      return;
+    }
+    for (String host : excludedHostnames) {
+      MasterWorkerInfo excludedWorker = mExcludedWorkers.get(host);
+      if (excludedWorker != null) {
+        // Worker has been decommissioned already.
+        mTempExcludedWorkers.put(host, excludedWorker);
+        continue;
+      }
+      for (MasterWorkerInfo worker : mWorkers) {
+        String workerHost = worker.getWorkerAddress().getHost();
+        if (host.equals(workerHost)) {
+          startDecommission(worker);
+          mTempExcludedWorkers.put(host, worker);
+          break;
+        }
+      }
+    }
+    if (!addOnly) {
+      mExcludedWorkers.clear();
+    }
+    mExcludedWorkers.putAll(mTempExcludedWorkers);
+    mTempExcludedWorkers.clear();
   }
 
   /**

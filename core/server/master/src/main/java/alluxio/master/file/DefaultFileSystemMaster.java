@@ -4748,4 +4748,9 @@ public final class DefaultFileSystemMaster extends CoreMaster
   public List<String> getStateLockSharedWaitersAndHolders() {
     return mMasterContext.getStateLockManager().getSharedWaitersAndHolders();
   }
+
+  @Override
+  public void decommissionWorkers(final Set<String> excludedWorkerSet, boolean addOnly) {
+    mBlockMaster.decommissionWorkers(excludedWorkerSet, addOnly);
+  }
 }
