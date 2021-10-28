@@ -3487,6 +3487,14 @@ public final class DefaultFileSystemMaster extends CoreMaster
       @Nullable Function<LockedInodePath, Inode> auditContextSrcInodeFunc,
       @Nullable PermissionCheckFunction permissionCheckOperation,
       boolean isGetFileInfo) throws AccessControlException, InvalidPathException {
+    if ((!options.hasSyncIntervalMs() || options.getSyncIntervalMs() < 0)
+        && ServerConfiguration.getMs(PropertyKey.USER_FILE_METADATA_SYNC_INTERVAL) < 0) {
+      if (ServerConfiguration.getList(
+          PropertyKey.MASTER_FILE_METADATA_SYNC_LIST, ",").contains(path.getPath())) {
+        options = options.toBuilder().setSyncIntervalMs(ServerConfiguration.getMs(
+            PropertyKey.MASTER_FILE_METADATA_SYNC_INTERVAL)).build();
+      }
+    }
     LockingScheme syncScheme = createSyncLockingScheme(path, options, isGetFileInfo);
     InodeSyncStream sync = new InodeSyncStream(syncScheme, this, rpcContext, syncDescendantType,
         options, auditContext, auditContextSrcInodeFunc, permissionCheckOperation, isGetFileInfo,

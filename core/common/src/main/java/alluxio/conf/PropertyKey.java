@@ -4263,6 +4263,27 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
+  public static final PropertyKey MASTER_FILE_METADATA_SYNC_INTERVAL =
+      new Builder(Name.MASTER_FILE_METADATA_SYNC_INTERVAL)
+          .setDefaultValue("-1")
+          .setDescription("The interval for syncing UFS metadata before invoking an "
+              + "operation on a path. -1 means no sync will occur. 0 means Alluxio will "
+              + "always sync the metadata of the path before an operation. If you specify a time "
+              + "interval, Alluxio will (best effort) not re-sync a path within that time "
+              + "interval. Syncing the metadata for a path must interact with the UFS, so it is "
+              + "an expensive operation. If a sync is performed for an operation, the "
+              + "configuration of \"alluxio.master.file.metadata.sync.list\" should be set.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey MASTER_FILE_METADATA_SYNC_LIST =
+      new Builder(Name.MASTER_FILE_METADATA_SYNC_LIST)
+          .setDefaultValue("")
+          .setDescription("A comma-separated list of the paths which are "
+              + "configured to be synced, separated by semi-colons.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.MASTER)
+          .build();
   public static final PropertyKey USER_FILE_PASSIVE_CACHE_ENABLED =
       new Builder(Name.USER_FILE_PASSIVE_CACHE_ENABLED)
           .setDefaultValue(true)
@@ -6736,6 +6757,10 @@ public final class PropertyKey implements Comparable<PropertyKey> {
         "alluxio.user.file.metadata.load.type";
     public static final String USER_FILE_METADATA_SYNC_INTERVAL =
         "alluxio.user.file.metadata.sync.interval";
+    public static final String MASTER_FILE_METADATA_SYNC_INTERVAL =
+        "alluxio.master.file.metadata.sync.interval";
+    public static final String MASTER_FILE_METADATA_SYNC_LIST =
+        "alluxio.master.file.metadata.sync.list";
     public static final String USER_FILE_PASSIVE_CACHE_ENABLED =
         "alluxio.user.file.passive.cache.enabled";
     public static final String USER_FILE_READ_TYPE_DEFAULT = "alluxio.user.file.readtype.default";
