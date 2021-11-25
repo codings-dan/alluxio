@@ -15,11 +15,11 @@ import static com.google.common.hash.Hashing.md5;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import alluxio.AlluxioURI;
-import alluxio.Constants;
 import alluxio.client.file.CacheContext;
 import alluxio.client.file.URIStatus;
 import alluxio.client.file.cache.CacheManager;
 import alluxio.client.file.cache.LocalCacheFileInStream;
+import alluxio.client.file.cache.filter.CacheFilter;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.metrics.MetricsConfig;
 import alluxio.metrics.MetricsSystem;
@@ -54,6 +54,7 @@ public class LocalCacheFileSystem extends org.apache.hadoop.fs.FileSystem {
   private final HadoopFileOpener mHadoopFileOpener;
   private final LocalCacheFileInStream.FileInStreamOpener mAlluxioFileOpener;
   private CacheManager mCacheManager;
+  private CacheFilter mCacheFilter;
   private org.apache.hadoop.conf.Configuration mHadoopConf;
   private AlluxioConfiguration mAlluxioConf;
 
@@ -90,6 +91,7 @@ public class LocalCacheFileSystem extends org.apache.hadoop.fs.FileSystem {
     }
     MetricsSystem.startSinksFromConfig(new MetricsConfig(metricsProperties));
     mCacheManager = CacheManager.Factory.get(mAlluxioConf);
+    mCacheFilter = CacheFilter.create(mAlluxioConf);
   }
 
   @Override
@@ -141,7 +143,7 @@ public class LocalCacheFileSystem extends org.apache.hadoop.fs.FileSystem {
    * @return an {@link FSDataInputStream} at the indicated path of a file
    */
   public FSDataInputStream open(URIStatus status, int bufferSize) throws IOException {
-    if (mCacheManager == null) {
+    if (mCacheManager == null || !mCacheFilter.needsCache(status)) {
       return mExternalFileSystem.open(HadoopUtils.toPath(new AlluxioURI(status.getPath())),
           bufferSize);
     }
