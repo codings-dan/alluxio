@@ -3121,6 +3121,14 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.WORKER)
           .build();
+  public static final PropertyKey WORKER_BLOCK_ANNOTATOR_ENABLED =
+      new Builder(Name.WORKER_BLOCK_ANNOTATOR_ENABLED)
+          .setDefaultValue(true)
+          .setDescription("If false, the worker will not evict when insufficient space for "
+              + "worker.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.WORKER)
+          .build();
   public static final PropertyKey WORKER_FUSE_ENABLED =
       new Builder(Name.WORKER_FUSE_ENABLED)
           .setDefaultValue(false)
@@ -6709,6 +6717,8 @@ public final class PropertyKey implements Comparable<PropertyKey> {
         "alluxio.worker.block.annotator.lrfu.attenuation.factor";
     public static final String WORKER_BLOCK_ANNOTATOR_LRFU_STEP_FACTOR =
         "alluxio.worker.block.annotator.lrfu.step.factor";
+    public static final String WORKER_BLOCK_ANNOTATOR_ENABLED =
+        "alluxio.worker.block.annotator.enabled";
     public static final String WORKER_FUSE_ENABLED =
         "alluxio.worker.fuse.enabled";
     public static final String WORKER_FUSE_MOUNT_ALLUXIO_PATH =
