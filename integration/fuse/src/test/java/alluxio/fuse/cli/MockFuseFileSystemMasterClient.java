@@ -41,6 +41,7 @@ import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -178,6 +179,11 @@ class MockFuseFileSystemMasterClient implements FileSystemMasterClient {
   @Override
   public List<String> getStateLockHolders() throws AlluxioStatusException {
     return Collections.EMPTY_LIST;
+  }
+
+  @Override
+  public void decommissionWorkers(boolean addOnly,
+      Set<String> excludedWorkerSet) throws AlluxioStatusException {
   }
 
   @Override
