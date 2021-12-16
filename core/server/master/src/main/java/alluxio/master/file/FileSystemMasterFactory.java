@@ -48,7 +48,7 @@ public final class FileSystemMasterFactory implements MasterFactory<CoreMasterCo
   public FileSystemMaster create(MasterRegistry registry, CoreMasterContext context) {
     LOG.info("Creating {} ", FileSystemMaster.class.getName());
     BlockMaster blockMaster = registry.get(BlockMaster.class);
-    FileSystemMaster fileSystemMaster = new DefaultFileSystemMaster(blockMaster, context);
+    FileSystemMaster fileSystemMaster = new TxFileSystemMaster(blockMaster, context);
     registry.add(FileSystemMaster.class, fileSystemMaster);
     return fileSystemMaster;
   }

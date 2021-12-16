@@ -76,6 +76,30 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
+  public static final PropertyKey  MASTER_LIST_CONCURRENT_ENABLED =
+      new Builder(Name.MASTER_LIST_CONCURRENT_ENABLED)
+          .setDefaultValue(false)
+          .setDescription("Whether to enable the concurrent list.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.WORKER)
+          .build();
+  public static final PropertyKey MASTER_LIST_STATUS_EXECUTOR_POOL_SIZE =
+      new Builder(Name.MASTER_LIST_STATUS_EXECUTOR_POOL_SIZE)
+          .setDefaultSupplier(() -> Runtime.getRuntime().availableProcessors(),
+              "The total number of threads which can concurrently execute list status "
+                  + "operations.")
+          .setDescription("The number of threads used to execute list status "
+              + "operations")
+          .setScope(Scope.MASTER)
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .build();
+  public static final PropertyKey MASTER_SLOW_LIST_OPERATION_THRESHOLD =
+      new Builder(Name.MASTER_SLOW_LIST_OPERATION_THRESHOLD)
+          .setDefaultValue(10000)
+          .setDescription("The threshold for slow list operation")
+          .setScope(Scope.MASTER)
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .build();
 
   //
   // Shimfs  related properties
@@ -358,6 +382,12 @@ public final class TxPropertyKey {
     public static final String MASTER_CLIENT_TIMEOUT_MS = "alluxio.master.client.timeout";
     public static final String MASTER_COUNT_TO_REMOVE_BLOCKS_ENABLE =
         "alluxio.master.count.to.remove.blocks.enable";
+    public static final String MASTER_LIST_CONCURRENT_ENABLED =
+        "alluxio.master.list.concurrent.enabled";
+    public static final String MASTER_LIST_STATUS_EXECUTOR_POOL_SIZE =
+        "alluxio.master.list.status.executor.pool.size";
+    public static final String MASTER_SLOW_LIST_OPERATION_THRESHOLD =
+        "alluxio.master.slow.list.operation.threshold";
 
     //
     // Worker related properties

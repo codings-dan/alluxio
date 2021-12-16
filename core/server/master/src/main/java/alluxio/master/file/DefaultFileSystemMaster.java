@@ -432,6 +432,8 @@ public class DefaultFileSystemMaster extends CoreMaster
   /** Uri translator. */
   private UriTranslator mUriTranslator;
 
+  private long mSlowListOperationThreshold;
+
   final ThreadPoolExecutor mSyncPrefetchExecutor = new ThreadPoolExecutor(
       ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_UFS_PREFETCH_POOL_SIZE),
       ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_UFS_PREFETCH_POOL_SIZE),
@@ -551,6 +553,8 @@ public class DefaultFileSystemMaster extends CoreMaster
     mUriTranslator = UriTranslator.Factory.create(this, mMountTable, mInodeTree);
     MetricsSystem.registerGaugeIfAbsent(TxMetricKey.CLUSTER_REGISTER_CLIENTS.getName(),
         mClients::size);
+    mSlowListOperationThreshold = ServerConfiguration.getLong(
+        TxPropertyKey.MASTER_SLOW_LIST_OPERATION_THRESHOLD);
   }
 
   private static MountInfo getRootMountInfo(MasterUfsManager ufsManager) {
@@ -981,7 +985,7 @@ public class DefaultFileSystemMaster extends CoreMaster
     return getMountTable().reverseResolve(ufsPath).getMountInfo().getMountId();
   }
 
-  private FileInfo getFileInfoInternal(LockedInodePath inodePath)
+  protected FileInfo getFileInfoInternal(LockedInodePath inodePath)
       throws UnavailableException, FileDoesNotExistException {
     return getFileInfoInternal(inodePath, null);
   }
@@ -1064,6 +1068,12 @@ public class DefaultFileSystemMaster extends CoreMaster
     Metrics.GET_FILE_INFO_OPS.inc();
     LockingScheme lockingScheme = new LockingScheme(path, LockPattern.READ, false);
     boolean ufsAccessed = false;
+    long opTimeMs = System.currentTimeMillis();
+    long syncMetadataTimeMs = 0;
+    long loadNotExistTimeMs = 0;
+    long runAttempt = 0;
+    long tryLockTimeMs = 0;
+    long listStatusInternalTimeMs = 0;
     try (RpcContext rpcContext = createRpcContext(context);
         FileSystemMasterAuditContext auditContext =
             createAuditContext("listStatus", path, null, null)) {
@@ -1078,6 +1088,7 @@ public class DefaultFileSystemMaster extends CoreMaster
         context.getOptions().setLoadMetadataType(LoadMetadataPType.NEVER);
         ufsAccessed = true;
       }
+      syncMetadataTimeMs = System.currentTimeMillis() - opTimeMs;
       /*
       See the comments in #getFileIdInternal for an explanation on why the loop here is required.
        */
@@ -1100,14 +1111,19 @@ public class DefaultFileSystemMaster extends CoreMaster
       boolean loadMetadata = false;
       boolean run = true;
       while (run) {
+        runAttempt++;
         run = false;
         if (loadMetadata) {
+          long loadNotExistStartTimeMs = System.currentTimeMillis();
           loadMetadataIfNotExist(rpcContext, path, loadMetadataContext, false);
           ufsAccessed = true;
+          loadNotExistTimeMs += System.currentTimeMillis() - loadNotExistStartTimeMs;
         }
 
+        long tryLockStartTimeMs = System.currentTimeMillis();
         // We just synced; the new lock pattern should not sync.
         try (LockedInodePath inodePath = mInodeTree.lockInodePath(lockingScheme)) {
+          tryLockTimeMs += System.currentTimeMillis() - tryLockStartTimeMs;
           auditContext.setSrcInode(inodePath.getInodeOrNull());
           try {
             mPermissionChecker.checkPermission(Mode.Bits.READ, inodePath);
@@ -1155,10 +1171,13 @@ public class DefaultFileSystemMaster extends CoreMaster
             } catch (InvalidPathException e) {
               throw new FileDoesNotExistException(e.getMessage(), e);
             }
+            Counter counter =  Metrics.getUfsOpsSavedCounter(resolution.getUfsMountPointUri(),
+                Metrics.UFSOps.GET_FILE_INFO);
+            long listStatusInternalStartTimeMs = System.currentTimeMillis();
             listStatusInternal(context, rpcContext, inodePath, auditContext,
                 descendantTypeForListStatus, resultStream, 0,
-                Metrics.getUfsOpsSavedCounter(resolution.getUfsMountPointUri(),
-                    Metrics.UFSOps.GET_FILE_INFO));
+                counter);
+            listStatusInternalTimeMs += System.currentTimeMillis() - listStatusInternalStartTimeMs;
             if (!ufsAccessed) {
               Metrics.getUfsOpsSavedCounter(resolution.getUfsMountPointUri(),
                   Metrics.UFSOps.LIST_STATUS).inc();
@@ -1168,13 +1187,21 @@ public class DefaultFileSystemMaster extends CoreMaster
           Metrics.FILE_INFOS_GOT.inc();
         }
       }
+      long allTimeMs = System.currentTimeMillis() - opTimeMs;
+      if (allTimeMs > mSlowListOperationThreshold) {
+        LOG.warn("path {} slow listStatus exceed {} : descendantType {}, loadDescendantType {}, "
+                + "syncMetaTimeMs {}, runAttempt {}, loadNotExistMs {}, tryLockMs {}, "
+                + "listStatusInternalTimeMs {}",
+            path, allTimeMs, descendantType, loadDescendantType, syncMetadataTimeMs,
+            runAttempt, loadNotExistTimeMs, tryLockTimeMs, listStatusInternalTimeMs);
+      }
     }
   }
 
   @Override
   public List<FileInfo> listStatus(AlluxioURI path, ListStatusContext context)
       throws AccessControlException, FileDoesNotExistException, InvalidPathException, IOException {
-    final List<FileInfo> fileInfos = new ArrayList<>();
+    final List<FileInfo> fileInfos = Collections.synchronizedList(new ArrayList<>());
     listStatus(path, context, (item) -> fileInfos.add(item));
     return fileInfos;
   }
@@ -1193,7 +1220,7 @@ public class DefaultFileSystemMaster extends CoreMaster
    * @param resultStream the stream to receive individual results
    * @param depth internal use field for tracking depth relative to root item
    */
-  private void listStatusInternal(ListStatusContext context, RpcContext rpcContext,
+  protected void listStatusInternal(ListStatusContext context, RpcContext rpcContext,
       LockedInodePath currInodePath, AuditContext auditContext, DescendantType descendantType,
       ResultStream<FileInfo> resultStream, int depth, Counter counter)
       throws FileDoesNotExistException, UnavailableException,

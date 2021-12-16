@@ -1740,6 +1740,7 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
+
   public static final PropertyKey MASTER_DAILY_BACKUP_STATE_LOCK_GRACE_MODE =
       new Builder(Name.MASTER_DAILY_BACKUP_STATE_LOCK_GRACE_MODE)
           .setDefaultValue("FORCED")
