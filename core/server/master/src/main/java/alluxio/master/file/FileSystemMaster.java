@@ -169,6 +169,8 @@ public interface FileSystemMaster extends Master {
       throws AccessControlException, FileDoesNotExistException, InvalidPathException,
       UnavailableException, IOException;
 
+  AlluxioURI translateUri(String paramString) throws InvalidPathException;
+
   /**
    * @return a read-only view of the file system master
    */
