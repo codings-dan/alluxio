@@ -1504,6 +1504,48 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
+  //
+  // Shimfs  related properties
+  //
+  public static final PropertyKey MASTER_SHIMFS_AUTO_MOUNT_ENABLED =
+      new Builder(Name.MASTER_SHIMFS_AUTO_MOUNT_ENABLED)
+          .setDescription("If enabled, Alluxio will attempt to mount UFS for foreign URIs.")
+          .setDefaultValue(Boolean.valueOf(false))
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey MASTER_SHIMFS_AUTO_MOUNT_ROOT =
+      new Builder(Name.MASTER_SHIMFS_AUTO_MOUNT_ROOT)
+          .setDescription("Alluxio root path for auto-mounted UFSes. "
+              + "This directory should already exist in Alluxio.")
+          .setDefaultValue("/auto-mount")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey MASTER_SHIMFS_AUTO_MOUNT_READONLY =
+      new Builder(Name.MASTER_SHIMFS_AUTO_MOUNT_READONLY)
+          .setDescription("If true, UFSes are auto-mounted as read-only.")
+          .setDefaultValue(Boolean.valueOf(true))
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey MASTER_SHIMFS_AUTO_MOUNT_SHARED =
+      new Builder(Name.MASTER_SHIMFS_AUTO_MOUNT_SHARED)
+          .setDescription("If true, UFSes are auto-mounted as shared.")
+          .setDefaultValue(Boolean.valueOf(false))
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey USER_SHIMFS_BYPASS_PREFIX_LIST =
+      new Builder(Name.USER_SHIMFS_BYPASS_PREFIX_LIST)
+          .setDescription("A comma-separated list of prefix paths to by-pass. "
+              + "User classpath should contain a native hadoop FileSystem implementation"
+              + " for target scheme. \n"
+              + String.format("For example: \"%s=s3://bucket1/foo, s3://bucket1/bar\"",
+                  Name.USER_SHIMFS_BYPASS_PREFIX_LIST))
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.CLIENT)
+          .build();
 
   /**
    * Master related properties.
@@ -2193,6 +2235,13 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setDescription("The maximum time to wait for ufs journal catching up "
               + "before listening to Zookeeper state change. This is added to prevent "
               + "frequently leadership transition during heavy journal replay stage.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey MASTER_URI_TRANSLATOR_IMPL =
+      new Builder(Name.MASTER_URI_TRANSLATOR_IMPL)
+          .setDefaultValue("alluxio.master.file.uritranslator.DefaultUriTranslator")
+          .setDescription("The class of uri translator implementation.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
@@ -6576,6 +6625,8 @@ public final class PropertyKey implements Comparable<PropertyKey> {
         "alluxio.master.update.check.enabled";
     public static final String MASTER_UPDATE_CHECK_INTERVAL =
         "alluxio.master.update.check.interval";
+    public static final String MASTER_URI_TRANSLATOR_IMPL =
+        "alluxio.master.uri.translator.impl";
     public static final String MASTER_WEB_BIND_HOST = "alluxio.master.web.bind.host";
     public static final String MASTER_WEB_HOSTNAME = "alluxio.master.web.hostname";
     public static final String MASTER_WEB_PORT = "alluxio.master.web.port";
@@ -6596,6 +6647,16 @@ public final class PropertyKey implements Comparable<PropertyKey> {
         "alluxio.master.journal.gc.threshold";
     public static final String MASTER_JOURNAL_TEMPORARY_FILE_GC_THRESHOLD_MS =
         "alluxio.master.journal.temporary.file.gc.threshold";
+    public static final String MASTER_SHIMFS_AUTO_MOUNT_ENABLED =
+        "alluxio.master.shimfs.auto.mount.enabled";
+    public static final String MASTER_SHIMFS_AUTO_MOUNT_ROOT =
+        "alluxio.master.shimfs.auto.mount.root";
+    public static final String MASTER_SHIMFS_AUTO_MOUNT_READONLY =
+        "alluxio.master.shimfs.auto.mount.readonly";
+    public static final String MASTER_SHIMFS_AUTO_MOUNT_SHARED =
+        "alluxio.master.shimfs.auto.mount.shared";
+    public static final String USER_SHIMFS_BYPASS_PREFIX_LIST =
+        "alluxio.user.shimfs.bypass.prefix.list";
     public static final String MASTER_WORKER_REGISTER_LEASE_ENABLED =
         "alluxio.master.worker.register.lease.enabled";
     public static final String MASTER_WORKER_REGISTER_LEASE_COUNT =

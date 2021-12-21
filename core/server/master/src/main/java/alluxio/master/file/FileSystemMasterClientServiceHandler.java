@@ -444,6 +444,6 @@ public final class FileSystemMasterClientServiceHandler
    * @return a {@link AlluxioURI} instance
    */
   private AlluxioURI getAlluxioURI(String uriStr) throws InvalidPathException {
-    return new AlluxioURI(uriStr);
+    return mFileSystemMaster.translateUri(uriStr);
   }
 }
