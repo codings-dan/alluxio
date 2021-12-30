@@ -85,6 +85,7 @@ var libJars = map[string]struct{}{
 	"underfs-swift":                {},
 	"underfs-wasb":                 {},
 	"underfs-web":                  {},
+	"underfs-chdfs":                {},
 }
 
 func validModules(modules map[string]module) []string {
