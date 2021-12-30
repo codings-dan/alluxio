@@ -21,6 +21,9 @@ import alluxio.grpc.CheckAccessPResponse;
 import alluxio.grpc.CheckConsistencyPOptions;
 import alluxio.grpc.CheckConsistencyPRequest;
 import alluxio.grpc.CheckConsistencyPResponse;
+import alluxio.grpc.CommandHeartbeatPOptions;
+import alluxio.grpc.CommandHeartbeatPRequest;
+import alluxio.grpc.CommandHeartbeatPResponse;
 import alluxio.grpc.CompleteFilePRequest;
 import alluxio.grpc.CompleteFilePResponse;
 import alluxio.grpc.CreateDirectoryPOptions;
@@ -435,6 +438,16 @@ public final class FileSystemMasterClientServiceHandler
       mFileSystemMaster.decommissionWorkers(excludedWorkerSet, addOnly);
       return DecommissionWorkersPResponse.newBuilder().build();
     }, "decommissionWorkers", "request=%s", responseObserver, request);
+  }
+
+  @Override
+  public void commandHeartbeat(CommandHeartbeatPRequest request,
+      StreamObserver<alluxio.grpc.CommandHeartbeatPResponse> responseObserver) {
+    RpcUtils.call(LOG, () -> {
+      long journalId = mFileSystemMaster.commandHeartbeat();
+      return CommandHeartbeatPResponse.newBuilder().setOptions(
+          CommandHeartbeatPOptions.newBuilder().setJournalId(journalId).build()).build();
+    }, "commandHeartbeat", "request=%s", responseObserver, request);
   }
 
   /**

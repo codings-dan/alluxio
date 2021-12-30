@@ -501,6 +501,14 @@ message DecommissionWorkersPOptions {
   repeated string excludedWorkers = 2;
 }
 
+message CommandHeartbeatPResponse {
+  required CommandHeartbeatPOptions options = 1;
+}
+message CommandHeartbeatPRequest {}
+message CommandHeartbeatPOptions {
+  required int64 journalId = 1;
+}
+
 /**
  * This interface contains file system master service endpoints for Alluxio clients.
  */
@@ -637,6 +645,8 @@ service FileSystemMasterClientService {
   * Decommission workers defined by excluded-workers file.
   */
   rpc DecommissionWorkers(DecommissionWorkersPOptions) returns (DecommissionWorkersPResponse);
+
+  rpc CommandHeartbeat(CommandHeartbeatPRequest) returns (CommandHeartbeatPResponse);
 }
 
 message FileSystemHeartbeatPResponse {

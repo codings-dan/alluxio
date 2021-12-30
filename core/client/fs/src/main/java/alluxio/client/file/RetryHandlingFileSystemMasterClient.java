@@ -19,6 +19,7 @@ import alluxio.grpc.CheckAccessPOptions;
 import alluxio.grpc.CheckAccessPRequest;
 import alluxio.grpc.CheckConsistencyPOptions;
 import alluxio.grpc.CheckConsistencyPRequest;
+import alluxio.grpc.CommandHeartbeatPRequest;
 import alluxio.grpc.CompleteFilePOptions;
 import alluxio.grpc.CompleteFilePRequest;
 import alluxio.grpc.CreateDirectoryPOptions;
@@ -394,6 +395,13 @@ public final class RetryHandlingFileSystemMasterClient extends AbstractMasterCli
     retryRPC(() -> mClient.decommissionWorkers(optionsBuilder.addAllExcludedWorkers(
         excludedWorkerSet.stream().collect(Collectors.toSet())).build()), RPC_LOG,
         "DecommissionWorkers", "");
+  }
+
+  @Override
+  public long heartbeat() throws AlluxioStatusException {
+    return retryRPC(() ->
+        mClient.commandHeartbeat(CommandHeartbeatPRequest.newBuilder().build())
+            .getOptions().getJournalId(), RPC_LOG, "CommandHeartbeat", "");
   }
 
   /**
