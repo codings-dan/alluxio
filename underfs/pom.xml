@@ -27,6 +27,7 @@
     <module>adl</module>
     <module>cephfs</module>
     <module>cephfs-hadoop</module>
+    <module>chdfs</module>
     <module>cos</module>
     <module>cosn</module>
     <module>gcs</module>
