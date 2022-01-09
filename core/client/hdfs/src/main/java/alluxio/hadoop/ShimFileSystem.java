@@ -63,7 +63,6 @@ public class ShimFileSystem extends AbstractFileSystem {
 
   private org.apache.hadoop.fs.FileSystem mByPassFs = null;
 
-
   /**
    * Constructs a new {@link ShimFileSystem}.
    */
@@ -304,10 +303,10 @@ public class ShimFileSystem extends AbstractFileSystem {
     boolean srcBypassed = pathByPassed(src);
     boolean dstBypassed = pathByPassed(dst);
 
-    if(srcBypassed && dstBypassed) {
+    if (srcBypassed && dstBypassed) {
       return mByPassFs.rename(src, dst);
     }
-    if(!srcBypassed && !dstBypassed) {
+    if (!srcBypassed && !dstBypassed) {
       return super.rename(src, dst);
     }
     // here only one is by-pass
@@ -339,7 +338,7 @@ public class ShimFileSystem extends AbstractFileSystem {
         return;
       }
     } catch (IOException e) {
-      LOG.error("path:{} setWorkingDirectory appear exception {}", path, e);;
+      LOG.error("path:{} setWorkingDirectory appear exception {}", path, e);
     }
     super.setWorkingDirectory(path);
   }
