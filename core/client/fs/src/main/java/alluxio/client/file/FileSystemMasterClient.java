@@ -312,4 +312,12 @@ public interface FileSystemMasterClient extends Client {
    */
   void decommissionWorkers(boolean addOnly, final Set<String> excludedWorkerSet)
       throws AlluxioStatusException;
+
+  /**
+   * Get journal id from master.
+   * @return journalId
+   */
+  default long heartbeat() throws AlluxioStatusException {
+    return -1;
+  }
 }

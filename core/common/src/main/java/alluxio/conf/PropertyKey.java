@@ -3121,6 +3121,14 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.WORKER)
           .build();
+  public static final PropertyKey WORKER_BLOCK_ANNOTATOR_ENABLED =
+      new Builder(Name.WORKER_BLOCK_ANNOTATOR_ENABLED)
+          .setDefaultValue(true)
+          .setDescription("If false, the worker will not evict when insufficient space for "
+              + "worker.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.WORKER)
+          .build();
   public static final PropertyKey WORKER_FUSE_ENABLED =
       new Builder(Name.WORKER_FUSE_ENABLED)
           .setDefaultValue(false)
@@ -4824,6 +4832,22 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setDefaultValue("10sec")
           .setDescription("The time period of client master heartbeat to "
               + "send the client-side metrics.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.CLIENT)
+          .build();
+  public static final PropertyKey USER_COMMAND_HEARTBEAT_ENABLED =
+      new Builder(Name.USER_COMMAND_HEARTBEAT_ENABLED)
+          .setDefaultValue(false)
+          .setDescription("Enable client get journal index from master")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.CLIENT)
+          .build();
+  public static final PropertyKey USER_COMMAND_HEARTBEAT_INTERVAL_MS =
+      new Builder(Name.USER_COMMAND_HEARTBEAT_INTERVAL_MS)
+          .setAlias("alluxio.user.command.heartbeat.interval.ms")
+          .setDefaultValue("5min")
+          .setDescription("The time period of client master heartbeat to "
+              + "get the journal index from master.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
@@ -6709,6 +6733,8 @@ public final class PropertyKey implements Comparable<PropertyKey> {
         "alluxio.worker.block.annotator.lrfu.attenuation.factor";
     public static final String WORKER_BLOCK_ANNOTATOR_LRFU_STEP_FACTOR =
         "alluxio.worker.block.annotator.lrfu.step.factor";
+    public static final String WORKER_BLOCK_ANNOTATOR_ENABLED =
+        "alluxio.worker.block.annotator.enabled";
     public static final String WORKER_FUSE_ENABLED =
         "alluxio.worker.fuse.enabled";
     public static final String WORKER_FUSE_MOUNT_ALLUXIO_PATH =
@@ -7051,6 +7077,10 @@ public final class PropertyKey implements Comparable<PropertyKey> {
         "alluxio.user.metrics.collection.enabled";
     public static final String USER_METRICS_HEARTBEAT_INTERVAL_MS =
         "alluxio.user.metrics.heartbeat.interval";
+    public static final String USER_COMMAND_HEARTBEAT_ENABLED =
+        "alluxio.user.command.heartbeat.enabled";
+    public static final String USER_COMMAND_HEARTBEAT_INTERVAL_MS =
+        "alluxio.user.command.heartbeat.interval.ms";
     public static final String USER_APP_ID = "alluxio.user.app.id";
     public static final String USER_NETWORK_DATA_TIMEOUT =
         "alluxio.user.network.data.timeout";

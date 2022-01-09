@@ -4781,4 +4781,13 @@ public final class DefaultFileSystemMaster extends CoreMaster
   public void decommissionWorkers(final Set<String> excludedWorkerSet, boolean addOnly) {
     mBlockMaster.decommissionWorkers(excludedWorkerSet, addOnly);
   }
+
+  @Override
+  public long commandHeartbeat()  {
+    // Get the journal index of the leader node. In most circumstances,
+    // the index of each node is same. If they are inconsistent, the largest
+    // journal Index belongs to the leader node.
+    return mMasterContext.getJournalSystem().getCurrentSequenceNumbers()
+          .values().stream().max(Long::compare).get();
+  }
 }

@@ -185,6 +185,11 @@ class MockFileSystemMasterClient implements FileSystemMasterClient {
   }
 
   @Override
+  public long heartbeat() throws AlluxioStatusException {
+    return 0;
+  }
+
+  @Override
   public void connect() throws IOException {
   }
 

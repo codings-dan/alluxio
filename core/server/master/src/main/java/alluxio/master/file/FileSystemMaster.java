@@ -620,4 +620,10 @@ public interface FileSystemMaster extends Master {
    *                but no effect to other workers already excluded.
    */
   void decommissionWorkers(final Set<String> excludedWorkerSet, boolean addOnly);
+
+  /**
+   * Get journal id from master.
+   * @return journalId
+   */
+  long commandHeartbeat();
 }
