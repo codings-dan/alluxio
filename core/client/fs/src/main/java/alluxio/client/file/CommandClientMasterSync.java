@@ -64,9 +64,9 @@ public final class CommandClientMasterSync {
     if (mMasterClient == null) {
       if (loadConf()) {
         mMasterClient = new RetryHandlingFileSystemMasterClient(MasterClientContext
-              .newBuilder(mContext)
-              .setMasterInquireClient(mInquireClient)
-              .build());
+            .newBuilder(mContext)
+            .setMasterInquireClient(mInquireClient)
+            .build());
       } else {
         LOG.error("Failed to load conf and can't heartbeat");
         return ERROR_CODE; // not heartbeat when failed to load conf
@@ -76,6 +76,7 @@ public final class CommandClientMasterSync {
       mJournalId = mMasterClient.heartbeat();
     } catch (IOException e) {
       LOG.warn("Failed to get journal id from master: {}", e.toString());
+      return ERROR_CODE;
     }
     return mJournalId;
   }

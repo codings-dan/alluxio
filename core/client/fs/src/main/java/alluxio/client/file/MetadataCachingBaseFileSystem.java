@@ -70,7 +70,9 @@ public class MetadataCachingBaseFileSystem extends BaseFileSystem {
     int maxSize = mFsContext.getClusterConf().getInt(PropertyKey.USER_METADATA_CACHE_MAX_SIZE);
     long expirationTimeMs = mFsContext.getClusterConf()
         .getMs(PropertyKey.USER_METADATA_CACHE_EXPIRATION_TIME);
-    mMetadataCache = new MetadataCache(maxSize, expirationTimeMs);
+    boolean commandHeartbeatEnabled =
+        context.getClusterConf().getBoolean(PropertyKey.USER_COMMAND_HEARTBEAT_ENABLED);
+    mMetadataCache = new MetadataCache(maxSize, expirationTimeMs, commandHeartbeatEnabled);
     int masterClientThreads = mFsContext.getClusterConf()
         .getInt(PropertyKey.USER_FILE_MASTER_CLIENT_POOL_SIZE_MAX);
     mDisableUpdateFileAccessTime = mFsContext.getClusterConf()
@@ -252,6 +254,13 @@ public class MetadataCachingBaseFileSystem extends BaseFileSystem {
       mMetadataCache.invalidateAll();
       LOG.debug("Invalidated all metadata cache");
     }
+  }
+
+  /**
+   * Access all caches to update expiration time.
+   */
+  public void updateMetadataCacheAll() {
+    mMetadataCache.getAll();
   }
 
   /**

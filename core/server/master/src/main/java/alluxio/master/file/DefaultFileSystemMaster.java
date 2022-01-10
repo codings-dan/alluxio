@@ -4788,6 +4788,6 @@ public final class DefaultFileSystemMaster extends CoreMaster
     // the index of each node is same. If they are inconsistent, the largest
     // journal Index belongs to the leader node.
     return mMasterContext.getJournalSystem().getCurrentSequenceNumbers()
-          .values().stream().max(Long::compare).get();
+        .values().stream().max(Long::compare).get();
   }
 }

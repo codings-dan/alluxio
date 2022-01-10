@@ -35,8 +35,8 @@ import java.util.concurrent.TimeUnit;
  * configuration that points to a given master. As new FileSystemContexts are created, if they
  * utilize the same connection details, then they can simply be added to this context so
  * that their information is included in the command heartbeat. To add them, one should simply
- * call {@link #addHeartbeat(ClientContext, MasterInquireClient)} with the necessary arguments.
- *
+ * call {@link #addHeartbeat(ClientContext, MasterInquireClient, MetadataCachingBaseFileSystem)}
+ * with the necessary arguments.
  * For each separate set of connection details, a new instance of this class is created. As
  * FileSystemContexts are closed, they remove themselves from the internal command heartbeat.
  *
@@ -49,35 +49,72 @@ public class CommandHeartbeatContext {
 
   /** A map from master connection details to heartbeat context instances. */
   private static final Map<MasterInquireClient.ConnectDetails, CommandHeartbeatContext>
-        COMMAND_HEARTBEAT = new ConcurrentHashMap<>(2);
+      COMMAND_HEARTBEAT = new ConcurrentHashMap<>(2);
+
+  private static final long ERROR_CODE = -1L;
+  private static final long INITIAL_CODE = -1L;
 
   /** The service which executes command heartbeat RPCs. */
   private static ScheduledExecutorService sExecutorService;
-
   private final MasterInquireClient.ConnectDetails mConnectDetails;
   private final CommandClientMasterSync mCommandClientMasterSync;
   private final AlluxioConfiguration mConf;
+  private long mFailHeartbeatTime;
+  private long mJournalId;
+  private MetadataCachingBaseFileSystem mFs;
 
   // This can only be a primitive if all accesses are synchronized
+  private int mCtxCount;
   private ScheduledFuture<?> mCommandMasterHeartbeatTask;
 
-  private CommandHeartbeatContext(ClientContext ctx, MasterInquireClient inquireClient) {
+  private CommandHeartbeatContext(ClientContext ctx,
+      MasterInquireClient inquireClient, MetadataCachingBaseFileSystem fs) {
+    mCtxCount = 0;
     mConnectDetails = inquireClient.getConnectDetails();
     mConf = ctx.getClusterConf();
     mCommandClientMasterSync = new CommandClientMasterSync(ctx, inquireClient);
+    mJournalId = 0;
+    mFailHeartbeatTime = INITIAL_CODE;
+    mFs = fs;
   }
 
   private synchronized void addContext() {
     // increment and lazily schedule the new heartbeat task if it is the first one
-    mCommandMasterHeartbeatTask =
-         sExecutorService.scheduleWithFixedDelay(this::heartbeat,
+    if (mCtxCount++ == 0) {
+      mCommandMasterHeartbeatTask =
+          sExecutorService.scheduleWithFixedDelay(this::heartbeat,
               mConf.getMs(PropertyKey.USER_COMMAND_HEARTBEAT_INTERVAL_MS),
               mConf.getMs(PropertyKey.USER_COMMAND_HEARTBEAT_INTERVAL_MS),
               TimeUnit.MILLISECONDS);
+    }
   }
 
-  private synchronized long heartbeat() {
-    return mCommandClientMasterSync.heartbeat();
+  private synchronized void heartbeat() {
+    long id = mCommandClientMasterSync.heartbeat();
+    if (id == ERROR_CODE) {
+      if (mFailHeartbeatTime == INITIAL_CODE) {
+        mFailHeartbeatTime = System.currentTimeMillis();
+        return;
+      }
+      long time = System.currentTimeMillis() - mFailHeartbeatTime;
+      long expirationTimeMs = mConf.getMs(PropertyKey.USER_COMMAND_HEARTBEAT_INTERVAL_MS);
+      if (time >= expirationTimeMs) {
+        LOG.info("Failed heartbeat in the past {} ms , clear all metadata cache", time);
+        mFs.dropMetadataCacheAll();
+      }
+      return;
+    }
+    mFailHeartbeatTime = INITIAL_CODE;
+    if (id != mJournalId) {
+      mJournalId = id;
+      //TODO(dragonyliu): clear metadata cache according to journal
+      LOG.info("Journal id change, clear all metadata cache");
+      mFs.dropMetadataCacheAll();
+    } else {
+      LOG.debug("The journal id has not changed, refresh the cache,"
+          + " and extend the expiration time.");
+      mFs.updateMetadataCacheAll();
+    }
   }
 
   /**
@@ -102,9 +139,10 @@ public class CommandHeartbeatContext {
    * his helps to consolidate RPCs and utilize less resources on the client.
    * @param ctx The application's client context
    * @param inquireClient the master inquire client used to connect to the master
+   * @param fs the metadata filesystem object
    */
   public static synchronized void addHeartbeat(ClientContext ctx,
-                                               MasterInquireClient inquireClient) {
+      MasterInquireClient inquireClient, MetadataCachingBaseFileSystem fs) {
     Preconditions.checkNotNull(ctx);
     Preconditions.checkNotNull(inquireClient);
 
@@ -116,7 +154,7 @@ public class CommandHeartbeatContext {
     }
     CommandHeartbeatContext heartbeatCtx = COMMAND_HEARTBEAT.computeIfAbsent(
         inquireClient.getConnectDetails(),
-        (addr) -> new CommandHeartbeatContext(ctx, inquireClient));
+        (addr) -> new CommandHeartbeatContext(ctx, inquireClient, fs));
     heartbeatCtx.addContext();
     LOG.debug("Registered command heartbeat");
   }
@@ -130,7 +168,7 @@ public class CommandHeartbeatContext {
    */
   public static synchronized void removeHeartbeat(ClientContext ctx) {
     MasterInquireClient.ConnectDetails connectDetails =
-          MasterInquireClient.Factory.getConnectDetails(ctx.getClusterConf());
+        MasterInquireClient.Factory.getConnectDetails(ctx.getClusterConf());
     CommandHeartbeatContext heartbeatCtx = COMMAND_HEARTBEAT.get(connectDetails);
     if (heartbeatCtx != null) {
       heartbeatCtx.removeContext();
@@ -142,7 +180,7 @@ public class CommandHeartbeatContext {
         sExecutorService.awaitTermination(5000, TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
         LOG.warn("Command heartbeat executor did not shut down in a timely manner: {}",
-              e.toString());
+            e.toString());
       }
       sExecutorService = null;
     }
@@ -157,6 +195,8 @@ public class CommandHeartbeatContext {
    * the same reference after removing.
    */
   private synchronized void removeContext() {
-    close();
+    if (--mCtxCount <= 0) {
+      close();
+    }
   }
 }

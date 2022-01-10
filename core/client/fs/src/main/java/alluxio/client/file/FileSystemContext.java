@@ -273,9 +273,6 @@ public class FileSystemContext implements Closeable {
       MetricsSystem.startSinks(getClusterConf().get(PropertyKey.METRICS_CONF_FILE));
       MetricsHeartbeatContext.addHeartbeat(getClientContext(), masterInquireClient);
     }
-    if (mCommandHeartbeatEnabled) {
-      CommandHeartbeatContext.addHeartbeat(getClientContext(), masterInquireClient);
-    }
     mFileSystemMasterClientPool = new FileSystemMasterClientPool(mMasterClientContext);
     mBlockMasterClientPool = new BlockMasterClientPool(mMasterClientContext);
     mBlockWorkerClientPoolMap = new ConcurrentHashMap<>();
