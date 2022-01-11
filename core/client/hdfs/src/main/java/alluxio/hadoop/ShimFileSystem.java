@@ -16,14 +16,18 @@ import alluxio.Constants;
 import alluxio.annotation.PublicApi;
 import alluxio.client.file.URIStatus;
 import alluxio.conf.PropertyKey;
+import alluxio.exception.AlluxioException;
 import alluxio.exception.InvalidPathException;
+import alluxio.grpc.DeletePOptions;
 import alluxio.util.io.PathUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -296,14 +300,106 @@ public class ShimFileSystem extends AbstractFileSystem {
   public boolean rename(Path src, Path dst) throws IOException {
     src = getFullPath(getUri(), src);
     dst = getFullPath(getUri(), dst);
-    if ((pathByPassed(src) ^ pathByPassed(dst)) != false) {
-      throw new IOException(
-          "Renaming across by-pass boundary is not supported.");
-    }
-    if (pathByPassed(src)) {
+    boolean srcBypassed = pathByPassed(src);
+    boolean dstBypassed = pathByPassed(dst);
+
+    if (srcBypassed && dstBypassed) {
       return mByPassFs.rename(src, dst);
     }
-    return super.rename(src, dst);
+    if (!srcBypassed && !dstBypassed) {
+      return super.rename(src, dst);
+    }
+    // here only one is by-pass
+    //FIXME: Across schema cannot support currently, we will fix it.
+    if (srcBypassed) {
+      try {
+        mFileSystem.loadMetadata(getAlluxioPath(dst));
+      } catch (AlluxioException e) {
+        LOG.warn("rename failed: {}", e.getMessage());
+        return false;
+      }
+    }
+    if (dstBypassed) {
+      try {
+        mFileSystem.delete(getAlluxioPath(src),
+            DeletePOptions.newBuilder().setRecursive(true).setAlluxioOnly(true).build());
+      } catch (AlluxioException e) {
+        LOG.warn("rename failed: {}", e.getMessage());
+        return false;
+      }
+    }
+    return mByPassFs.rename(src, dst);
+  }
+
+  public void setWorkingDirectory(Path path) {
+    path = getFullPath(getUri(), path);
+    try {
+      if (pathByPassed(path)) {
+        mByPassFs.setWorkingDirectory(path);
+        return;
+      }
+    } catch (IOException e) {
+      LOG.error("path:{} setWorkingDirectory appear exception {}", path, e);
+    }
+    super.setWorkingDirectory(path);
+  }
+
+  public FileChecksum getFileChecksum(Path path) throws IOException {
+    path = getFullPath(getUri(), path);
+    if (pathByPassed(path)) {
+      return mByPassFs.getFileChecksum(path);
+    }
+    return super.getFileChecksum(path);
+  }
+
+  public void setXAttr(Path path, String name, byte[] value) throws IOException {
+    path = getFullPath(getUri(), path);
+    if (pathByPassed(path)) {
+      mByPassFs.setXAttr(path, name, value);
+      return;
+    }
+    super.setXAttr(path, name, value);
+  }
+
+  public byte[] getXAttr(Path path, String name) throws IOException {
+    path = getFullPath(getUri(), path);
+    if (pathByPassed(path)) {
+      return mByPassFs.getXAttr(path, name);
+    }
+    return super.getXAttr(path, name);
+  }
+
+  public Map<String, byte[]> getXAttrs(Path path) throws IOException {
+    path = getFullPath(getUri(), path);
+    if (pathByPassed(path)) {
+      return mByPassFs.getXAttrs(path);
+    }
+    return super.getXAttrs(path);
+  }
+
+  public void removeXAttr(Path path, String name) throws IOException {
+    path = getFullPath(getUri(), path);
+    if (pathByPassed(path)) {
+      mByPassFs.removeXAttr(path, name);
+      return;
+    }
+    super.removeXAttr(path, name);
+  }
+
+  public List<String> listXAttrs(Path path) throws IOException {
+    path = getFullPath(getUri(), path);
+    if (pathByPassed(path)) {
+      return mByPassFs.listXAttrs(path);
+    }
+    return super.listXAttrs(path);
+  }
+
+  public ContentSummary getContentSummary(Path path) throws IOException {
+    path = getFullPath(getUri(), path);
+    if (pathByPassed(path)) {
+      return mByPassFs.getContentSummary(path);
+    }
+    return super.getContentSummary(path);
   }
 
   @VisibleForTesting
