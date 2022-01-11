@@ -310,6 +310,7 @@ public class ShimFileSystem extends AbstractFileSystem {
       return super.rename(src, dst);
     }
     // here only one is by-pass
+    //FIXME: Across schema cannot support currently, we will fix it.
     if (srcBypassed) {
       try {
         mFileSystem.loadMetadata(getAlluxioPath(dst));
@@ -327,7 +328,7 @@ public class ShimFileSystem extends AbstractFileSystem {
         return false;
       }
     }
-    return true;
+    return mByPassFs.rename(src, dst);
   }
 
   public void setWorkingDirectory(Path path) {
