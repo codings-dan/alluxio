@@ -61,7 +61,7 @@ public class CommandHeartbeatContext {
   private final AlluxioConfiguration mConf;
   private long mFailHeartbeatTime;
   private long mJournalId;
-  private MetadataCachingBaseFileSystem mFs;
+  private final MetadataCachingBaseFileSystem mFs;
 
   // This can only be a primitive if all accesses are synchronized
   private int mCtxCount;
@@ -99,7 +99,7 @@ public class CommandHeartbeatContext {
       long time = System.currentTimeMillis() - mFailHeartbeatTime;
       long expirationTimeMs = mConf.getMs(PropertyKey.USER_COMMAND_HEARTBEAT_INTERVAL_MS);
       if (time >= expirationTimeMs) {
-        LOG.info("Failed heartbeat in the past {} ms , clear all metadata cache", time);
+        LOG.info("Failed heartbeat in the past {} s , clear all metadata cache", time / 1000.0);
         mFs.dropMetadataCacheAll();
       }
       return;
@@ -107,11 +107,11 @@ public class CommandHeartbeatContext {
     mFailHeartbeatTime = INITIAL_CODE;
     if (id != mJournalId) {
       mJournalId = id;
-      //TODO(dragonyliu): clear metadata cache according to journal
+      // TODO(dragonyliu): clear metadata cache according to journal
       LOG.info("Journal id change, clear all metadata cache");
       mFs.dropMetadataCacheAll();
     } else {
-      LOG.debug("The journal id has not changed, refresh the cache,"
+      LOG.debug("The journal id has not changed, refresh the metadata cache,"
           + " and extend the expiration time.");
       mFs.updateMetadataCacheAll();
     }
