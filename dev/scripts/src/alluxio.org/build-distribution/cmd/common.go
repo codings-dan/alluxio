@@ -89,6 +89,11 @@ var libJars = map[string]struct{}{
 	"underfs-chdfs":                {},
 }
 
+// authModules is a map from authorization module to information for building the module.
+var authModules = map[string]module{
+	"auth-ranger-hdfs": {"ranger", "hdfs", true, "-pl integration/authorization/hdfs -Dauth.hadoop.version=2.8.5 -Dauth.plugin.name=ranger"},
+}
+
 func validModules(modules map[string]module) []string {
 	result := []string{}
 	for moduleName := range modules {

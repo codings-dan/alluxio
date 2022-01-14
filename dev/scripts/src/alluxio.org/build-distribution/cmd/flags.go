@@ -29,6 +29,7 @@ var (
 	mvnArgsFlag            string
 	targetFlag             string
 	ufsModulesFlag         string
+	authModulesFlag        string
 )
 
 // flags used by single and release to generate tarball
@@ -51,6 +52,11 @@ func handleUfsModulesAndLibJars() error {
 	if strings.ToLower(ufsModulesFlag) == "all" {
 		ufsModulesFlag = strings.Join(validModules(ufsModules), ",")
 	} else {
+		for _, module := range strings.Split(authModulesFlag, ",") {
+    		if _, ok := authModules[module]; !ok {
+    			return fmt.Errorf("auth module %v not recognized", module)
+    		}
+    	}
 		for _, module := range strings.Split(ufsModulesFlag, ",") {
 			if _, ok := ufsModules[module]; !ok {
 				return fmt.Errorf("ufs module %v not recognized", module)

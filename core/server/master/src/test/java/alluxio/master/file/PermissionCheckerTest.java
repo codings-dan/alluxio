@@ -32,6 +32,7 @@ import alluxio.master.file.meta.InodeDirectoryIdGenerator;
 import alluxio.master.file.meta.InodeLockManager;
 import alluxio.master.file.meta.InodeTree;
 import alluxio.master.file.meta.InodeTree.LockPattern;
+import alluxio.master.file.meta.InodeView;
 import alluxio.master.file.meta.LockedInodePath;
 import alluxio.master.file.meta.MountTable;
 import alluxio.master.file.meta.MutableInode;
@@ -109,7 +110,6 @@ public final class PermissionCheckerTest {
   private static InodeTree sTree;
   private static MasterRegistry sRegistry;
   private static MetricsMaster sMetricsMaster;
-
   private PermissionChecker mPermissionChecker;
 
   @ClassRule
@@ -197,6 +197,7 @@ public final class PermissionCheckerTest {
     sRegistry.start(true);
 
     GroupMappingServiceTestUtils.resetCache();
+
     ServerConfiguration.set(PropertyKey.SECURITY_GROUP_MAPPING_CLASS,
         FakeUserGroupsMapping.class.getName());
     ServerConfiguration.set(PropertyKey.SECURITY_AUTHENTICATION_TYPE,
@@ -424,6 +425,56 @@ public final class PermissionCheckerTest {
       perm = mPermissionChecker.getPermission(path);
       Assert.assertEquals(TEST_WEIRD_MODE.getOtherBits(), perm);
     }
+  }
+
+  @Test
+  public void checkPermissionWithProviderSuccess() throws Exception {
+    InodeAttributesProvider provider = mock(InodeAttributesProvider.class);
+    AccessControlEnforcer ace =
+        mock(AccessControlEnforcer.class);
+    org.mockito.Mockito
+        .when(provider.getExternalAccessControlEnforcer(org.mockito.Mockito.any()))
+        .thenReturn(ace);
+    org.mockito.Mockito
+        .when(provider.getAttributes(org.mockito.Mockito.any(), org.mockito.Mockito.any()))
+        .thenAnswer(invocation -> invocation.getArgument(
+            1, alluxio.master.file.meta.InodeAttributes.class));
+    mPermissionChecker = new ExtendablePermissionChecker(sTree, provider);
+
+    AuthenticatedClientUser.set(TEST_USER_1.getUser());
+    try (LockedInodePath inodePath = sTree.lockInodePath(
+        new AlluxioURI(TEST_DIR_FILE_URI), InodeTree.LockPattern.READ)) {
+      mPermissionChecker.checkPermission(Mode.Bits.READ, inodePath);
+      List<InodeView> inodes = inodePath.getInodeViewList();
+      org.mockito.Mockito.verify(ace).checkPermission(TEST_USER_1.getUser(),
+          Lists.newArrayList(TEST_USER_1.getGroup()), Mode.Bits.READ, TEST_DIR_FILE_URI,
+          inodes, inodes.stream()
+              .map(x -> new ExtendablePermissionChecker.DefaultInodeAttributes(x))
+              .collect(java.util.stream.Collectors.toList()), false);
+    }
+  }
+
+  @Test
+  public void checkPermissionWithProviderFail() throws Exception {
+    InodeAttributesProvider provider = mock(InodeAttributesProvider.class);
+    AccessControlEnforcer ace =
+        mock(AccessControlEnforcer.class);
+    org.mockito.Mockito
+        .when(provider.getExternalAccessControlEnforcer(org.mockito.Mockito.any()))
+        .thenReturn(ace);
+    org.mockito.Mockito
+        .when(provider.getAttributes(org.mockito.Mockito.any(), org.mockito.Mockito.any()))
+        .thenAnswer(invocation -> invocation.getArgument(
+            1, alluxio.master.file.meta.InodeAttributes.class));
+    org.mockito.Mockito
+        .doThrow(new AccessControlException("test"))
+        .when(ace).checkPermission(org.mockito.Mockito.any(),
+            org.mockito.Mockito.any(), org.mockito.Mockito.any(), org.mockito.Mockito.any(),
+            org.mockito.Mockito.any(), org.mockito.Mockito.any(), org.mockito.Mockito.anyBoolean());
+    mPermissionChecker = new ExtendablePermissionChecker(sTree, provider);
+    mThrown.expect(AccessControlException.class);
+
+    checkPermission(TEST_USER_1, Mode.Bits.READ, TEST_DIR_FILE_URI);
   }
 
   /**

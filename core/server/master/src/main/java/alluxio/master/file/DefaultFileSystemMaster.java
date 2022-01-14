@@ -386,6 +386,9 @@ public final class DefaultFileSystemMaster extends CoreMaster
   /** Thread pool which asynchronously handles the completion of persist jobs. */
   private java.util.concurrent.ThreadPoolExecutor mPersistCheckerPool;
 
+  /** The provider for authorization with external plugins. */
+  private InodeAttributesProvider mAuthProvider = null;
+
   private ActiveSyncManager mSyncManager;
 
   /** Log writer for user access audit log. */
@@ -471,8 +474,16 @@ public final class DefaultFileSystemMaster extends CoreMaster
         return Type.STATE_LOCK_TRACKER;
       }
     };
-    mPermissionChecker = PermissionChecker.Factory.create(
-        ServerConfiguration.global(), mInodeTree);
+    if (ServerConfiguration.getBoolean(PropertyKey.SECURITY_AUTHORIZATION_PLUGINS_ENABLED)) {
+      AbstractInodeAttributesProviderFactory authProviderFactory =
+          new AbstractInodeAttributesProviderFactory();
+      mUfsManager.registerUfsServiceFactory(InodeAttributesProvider.class, authProviderFactory);
+      mAuthProvider = new ExtensionInodeAttributesProvider(mMountTable, authProviderFactory);
+      mPermissionChecker = new ExtendablePermissionChecker(mInodeTree, mAuthProvider);
+      mUfsManager.addUfsServersForRootUfs();
+    } else {
+      mPermissionChecker = new DefaultPermissionChecker(mInodeTree);
+    }
     mJobMasterClientPool = new JobMasterClientPool(JobMasterClientContext
         .newBuilder(ClientContext.create(ServerConfiguration.global())).build());
     mPersistRequests = new ConcurrentHashMap<>();
@@ -705,6 +716,9 @@ public final class DefaultFileSystemMaster extends CoreMaster
                 (int) ServerConfiguration.getMs(PropertyKey.UNDERFS_CLEANUP_INTERVAL),
                 ServerConfiguration.global(), mMasterContext.getUserState()));
       }
+      if (mAuthProvider != null) {
+        mAuthProvider.start();
+      }
       mAccessTimeUpdater.start();
       mSyncManager.start();
     }
@@ -718,6 +732,10 @@ public final class DefaultFileSystemMaster extends CoreMaster
     }
     mSyncManager.stop();
     mAccessTimeUpdater.stop();
+
+    if (mAuthProvider != null) {
+      mAuthProvider.stop();
+    }
     super.stop();
   }
 

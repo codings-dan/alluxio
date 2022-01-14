@@ -5668,6 +5668,52 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setDefaultValue("3.3.0")
           .setIsHidden(true)
           .build();
+  public static final PropertyKey UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME =
+      new Builder(Name.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME)
+          .setDescription("Name of the authorization plugin for the under filesystem.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS =
+      new PropertyKey.Builder(PropertyKey.Name.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS)
+          .setDescription("Classpaths for the under filesystem authorization plugin,"
+              + " separated by colons.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey SECURITY_AUTHORIZATION_PLUGIN_NAME =
+      new Builder(Name.SECURITY_AUTHORIZATION_PLUGIN_NAME)
+          .setDescription("Plugin for master authorization.")
+          .setConsistencyCheckLevel(PropertyKey.ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey SECURITY_AUTHORIZATION_PLUGIN_PATHS =
+      new Builder(Name.SECURITY_AUTHORIZATION_PLUGIN_PATHS)
+          .setDescription("Classpath for master authorization plugin, separated by colons.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey SECURITY_AUTHORIZATION_PLUGINS_ENABLED =
+      new Builder(Name.SECURITY_AUTHORIZATION_PLUGINS_ENABLED)
+          .setDefaultValue(false)
+          .setDescription("Enable plugins for authorization.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED =
+      new Builder(Name.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)
+          .setDefaultValue(false)
+          .setDescription("Enable convert to external ufs namespace Uri.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED =
+      new Builder(Name.SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED)
+          .setDefaultValue(false)
+          .setDescription("enable HDFS authorization plugin compatible with ozone")
+          .setConsistencyCheckLevel(PropertyKey.ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
 
   //
   // Job service
@@ -6248,6 +6294,14 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     public static final String UNDERFS_WEB_PARENT_NAMES = "alluxio.underfs.web.parent.names";
     public static final String UNDERFS_WEB_TITLES = "alluxio.underfs.web.titles";
     public static final String UNDERFS_VERSION = "alluxio.underfs.version";
+    public static final String UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME =
+        "alluxio.underfs.security.authorization.plugin.name";
+    public static final String UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS =
+        "alluxio.underfs.security.authorization.plugin.paths";
+    public static final String SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED =
+        "alluxio.security.authorization.plugins.external.ufs.namespace.enabled";
+    public static final String SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED =
+        "alluxio.security.authorization.plugin.hdfs.compatible.ozone.enabled";
     public static final String UNDERFS_OBJECT_STORE_BREADCRUMBS_ENABLED =
         "alluxio.underfs.object.store.breadcrumbs.enabled";
     public static final String UNDERFS_OBJECT_STORE_SERVICE_THREADS =
@@ -7220,6 +7274,12 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     //
     // Security related properties
     //
+    public static final String SECURITY_AUTHORIZATION_PLUGIN_NAME =
+        "alluxio.security.authorization.plugin.name";
+    public static final String SECURITY_AUTHORIZATION_PLUGIN_PATHS =
+        "alluxio.security.authorization.plugin.paths";
+    public static final String SECURITY_AUTHORIZATION_PLUGINS_ENABLED =
+        "alluxio.security.authorization.plugins.enabled";
     public static final String SECURITY_AUTHENTICATION_CUSTOM_PROVIDER_CLASS =
         "alluxio.security.authentication.custom.provider.class";
     public static final String SECURITY_AUTHENTICATION_TYPE =
