@@ -5714,6 +5714,66 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(PropertyKey.ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_URL =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_URL)
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SSL =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL)
+          .setDefaultValue(false)
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE)
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD)
+          .setDisplayType(DisplayType.CREDENTIALS)
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD_FILE =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD_FILE)
+          .setDisplayType(DisplayType.CREDENTIALS)
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_BIND_USER =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_BIND_USER)
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD)
+          .setDisplayType(DisplayType.CREDENTIALS)
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD_FILE =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD_FILE)
+          .setDisplayType(DisplayType.CREDENTIALS)
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_BASE =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_BASE)
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_USER =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_USER)
+          .setDefaultValue("(&(objectClass=user)(sAMAccountName={0}))")
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_GROUP =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_GROUP)
+          .setDefaultValue("(objectClass=group)")
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT)
+          .setDefaultValue("10000")
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER)
+          .setDefaultValue("member")
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_ATTR_GROUP_NAME =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_GROUP_NAME)
+          .setDefaultValue("cn")
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_UID =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_UID)
+          .setDefaultValue("uidNumber")
+          .build();
+  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_GID =
+      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_GID)
+          .setDefaultValue("gidNumber")
+          .build();
 
   //
   // Job service
@@ -7314,6 +7374,38 @@ public final class PropertyKey implements Comparable<PropertyKey> {
         "alluxio.security.stale.channel.purge.interval";
     public static final String SECURITY_PERMISSION_CHECKER_CUSTOM_PROVIDER_CLASS =
         "alluxio.security.permission.checker.custom.provider.class";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_URL =
+        "alluxio.security.group.mapping.ldap.url";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_SSL =
+        "alluxio.security.group.mapping.ldap.ssl";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE =
+        "alluxio.security.group.mapping.ldap.ssl.keystore";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD =
+        "alluxio.security.group.mapping.ldap.ssl.keystore.password";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD_FILE =
+        "alluxio.security.group.mapping.ldap.ssl.keystore.password.file";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_BIND_USER =
+        "alluxio.security.group.mapping.ldap.bind.user";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD =
+        "alluxio.security.group.mapping.ldap.bind.password";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD_FILE =
+        "alluxio.security.group.mapping.ldap.bind.password.file";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_BASE =
+        "alluxio.security.group.mapping.ldap.base";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_USER =
+        "alluxio.security.group.mapping.ldap.search.filter.user";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_GROUP =
+        "alluxio.security.group.mapping.ldap.search.filter.group";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT =
+        "alluxio.security.group.mapping.ldap.search.timeout";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER =
+        "alluxio.security.group.mapping.ldap.attr.member";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_ATTR_GROUP_NAME =
+        "alluxio.security.group.mapping.ldap.attr.group.name";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_UID =
+        "alluxio.security.group.mapping.ldap.attr.posix.uid";
+    public static final String SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_GID =
+        "alluxio.security.group.mapping.ldap.attr.posix.gid";
 
     //
     // Network TLS support
