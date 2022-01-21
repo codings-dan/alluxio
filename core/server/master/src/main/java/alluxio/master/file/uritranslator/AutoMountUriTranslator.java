@@ -53,6 +53,7 @@ public class AutoMountUriTranslator implements UriTranslator {
     mInodeTree = inodeTree;
   }
 
+  @Override
   public AlluxioURI translateUri(String uriStr) throws InvalidPathException {
     AlluxioURI uri = new AlluxioURI(uriStr);
     // Scheme-less URIs are regarded as Alluxio URI.

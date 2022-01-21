@@ -12,29 +12,42 @@
 package alluxio.master.file.uritranslator;
 
 import alluxio.AlluxioURI;
+import alluxio.Constants;
 import alluxio.exception.InvalidPathException;
 import alluxio.master.file.FileSystemMaster;
 import alluxio.master.file.meta.InodeTree;
 import alluxio.master.file.meta.MountTable;
 
+import com.google.common.base.Strings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.net.URI;
+
 /**
- * A default implementation of UriTranslator.
+ * Auto mount if the resolve unsuccessfully.
  */
-public class DefaultUriTranslator implements UriTranslator {
+public class MergeAuthorityToPathUriTranslator implements UriTranslator {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      MergeAuthorityToPathUriTranslator.class);
 
-  protected FileSystemMaster mMaster;
-  protected MountTable mMountTable;
-  protected InodeTree mInodeTree;
-
-  public DefaultUriTranslator(FileSystemMaster master,
+  public MergeAuthorityToPathUriTranslator(FileSystemMaster master,
       MountTable mountTable, InodeTree inodeTree) {
-    mMaster = master;
-    mMountTable = mountTable;
-    mInodeTree = inodeTree;
   }
 
   @Override
   public AlluxioURI translateUri(String uriStr) throws InvalidPathException {
-    return new AlluxioURI(uriStr);
+    AlluxioURI uri = new AlluxioURI(uriStr);
+    // Scheme-less URIs are regarded as Alluxio URI.
+    if (uri.getScheme() == null || uri.getScheme().equals(Constants.SCHEME)) {
+      return uri;
+    }
+
+    URI uriFromClient = URI.create(uriStr);
+    String authority = uriFromClient.getAuthority();
+    if (!Strings.isNullOrEmpty(authority)) {
+      return new AlluxioURI("/" + authority + uriFromClient.getPath());
+    }
+    return uri;
   }
 }

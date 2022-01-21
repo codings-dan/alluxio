@@ -39,6 +39,18 @@ public interface UriTranslator {
         InodeTree inodeTree) {
       String className =
           ServerConfiguration.get(TxPropertyKey.MASTER_URI_TRANSLATOR_IMPL);
+      return create(master, mountTable, inodeTree, className);
+    }
+
+    /**
+     * @param master Alluxio file system master
+     * @param mountTable Alluxio mount table
+     * @param inodeTree inode tree of the file system master
+     * @return the generated {@link UriTranslator}
+     */
+    public static UriTranslator create(FileSystemMaster master, MountTable mountTable,
+        InodeTree inodeTree, String className) {
+
       Class<?> providerClass;
       try {
         providerClass = Class.forName(className);

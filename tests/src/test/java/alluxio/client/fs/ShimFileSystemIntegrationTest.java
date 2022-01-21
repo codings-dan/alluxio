@@ -27,6 +27,7 @@ import alluxio.grpc.DeletePOptions;
 import alluxio.grpc.ListStatusPOptions;
 import alluxio.grpc.SetAttributePOptions;
 import alluxio.grpc.WritePType;
+import alluxio.master.file.uritranslator.AutoMountUriTranslator;
 import alluxio.testutils.LocalAlluxioClusterResource;
 import alluxio.uri.Authority;
 import alluxio.util.io.FileUtils;
@@ -48,7 +49,10 @@ public class ShimFileSystemIntegrationTest {
 
   @Rule
   public LocalAlluxioClusterResource mLocalAlluxioClusterResource =
-      new LocalAlluxioClusterResource.Builder().build();
+      new LocalAlluxioClusterResource.Builder()
+          .setProperty(TxPropertyKey.MASTER_URI_TRANSLATOR_IMPL,
+              AutoMountUriTranslator.class.getName())
+          .build();
 
   @Rule
   public ExpectedException mThrown = ExpectedException.none();
