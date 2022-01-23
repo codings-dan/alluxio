@@ -13,8 +13,8 @@ package alluxio.master.file;
 
 import alluxio.AlluxioURI;
 import alluxio.Constants;
-import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AccessControlException;
 import alluxio.exception.InvalidPathException;
 import alluxio.extensions.ClassLoaderContext;
@@ -197,9 +197,9 @@ public final class ExtensionInodeAttributesProvider implements InodeAttributesPr
       InodeAttributesProvider ufsAuthProvider = getUfsProvider(mMountTable, alluxioUri);
       if (ufsAuthProvider != null) {
         if (ServerConfiguration
-            .isSet(PropertyKey.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)
+            .isSet(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)
             && ServerConfiguration.getBoolean(
-            PropertyKey.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)) {
+            TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)) {
           ufsUri = convertToExternalUfsNameSpace(ufsUri);
         }
         // converts inodes and inode attributes to match ufs paths
@@ -289,9 +289,9 @@ public final class ExtensionInodeAttributesProvider implements InodeAttributesPr
         MountTable.Resolution resolution) throws InvalidPathException {
       AlluxioURI ufsUrl = resolution.getUri();
       if (ServerConfiguration
-          .isSet(PropertyKey.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)
+          .isSet(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)
           && ServerConfiguration.getBoolean(
-          PropertyKey.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)) {
+          TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)) {
         ufsUrl = convertToExternalUfsNameSpace(ufsUrl);
       }
       String[] ufsPathParts = PathUtils.getPathComponents(ufsUrl.getPath());

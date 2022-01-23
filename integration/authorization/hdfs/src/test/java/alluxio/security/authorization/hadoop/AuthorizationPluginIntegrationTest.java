@@ -23,6 +23,7 @@ import alluxio.conf.InstancedConfiguration;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
 import alluxio.conf.Source;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AccessControlException;
 import alluxio.grpc.ListStatusPOptions;
 import alluxio.grpc.LoadMetadataPType;
@@ -107,12 +108,12 @@ public final class AuthorizationPluginIntegrationTest {
   @Rule
   public ConfigurationRule mConfigurationRule = new ConfigurationRule(new HashMap() {
     {
-      put(alluxio.conf.PropertyKey.SECURITY_AUTHORIZATION_PERMISSION_UMASK, "000");
-      put(alluxio.conf.PropertyKey.MASTER_JOURNAL_TAILER_SLEEP_TIME_MS, "20");
-      put(alluxio.conf.PropertyKey.MASTER_JOURNAL_TAILER_SHUTDOWN_QUIET_WAIT_TIME_MS, "0");
-      put(alluxio.conf.PropertyKey.MASTER_MOUNT_TABLE_ROOT_UFS, AlluxioTestDirectory
+      put(PropertyKey.SECURITY_AUTHORIZATION_PERMISSION_UMASK, "000");
+      put(PropertyKey.MASTER_JOURNAL_TAILER_SLEEP_TIME_MS, "20");
+      put(PropertyKey.MASTER_JOURNAL_TAILER_SHUTDOWN_QUIET_WAIT_TIME_MS, "0");
+      put(PropertyKey.MASTER_MOUNT_TABLE_ROOT_UFS, AlluxioTestDirectory
           .createTemporaryDirectory("FileSystemMasterTest").getAbsolutePath());
-      put(alluxio.conf.PropertyKey.SECURITY_AUTHORIZATION_PLUGINS_ENABLED, "true");
+      put(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_ENABLED, "true");
     }
   }, ServerConfiguration.global());
 
@@ -123,10 +124,6 @@ public final class AuthorizationPluginIntegrationTest {
   // Set ttl interval to 0 so that there is no delay in detecting expired files.
   @ClassRule
   public static TtlIntervalRule sTtlIntervalRule = new TtlIntervalRule(0);
-
-/**
-   * Sets up the dependencies before a test runs.
-   */
 
   @Before
   public void before() throws Exception {
@@ -139,10 +136,6 @@ public final class AuthorizationPluginIntegrationTest {
     mJournalFolder = mTestFolder.newFolder().getAbsolutePath();
     startServices();
   }
-
-/**
-   * Resets global state after each test run.
-   */
 
   @After
   public void after() throws Exception {

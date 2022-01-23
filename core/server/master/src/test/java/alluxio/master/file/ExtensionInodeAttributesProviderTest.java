@@ -29,6 +29,7 @@ import alluxio.ConfigurationTestUtils;
 import alluxio.Constants;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AccessControlException;
 import alluxio.exception.InvalidPathException;
 import alluxio.grpc.CreateDirectoryPOptions;
@@ -204,7 +205,7 @@ public final class ExtensionInodeAttributesProviderTest {
     ServerConfiguration.set(PropertyKey.SECURITY_AUTHENTICATION_TYPE,
             AuthType.SIMPLE.getAuthName());
     ServerConfiguration.set(PropertyKey.SECURITY_AUTHORIZATION_PERMISSION_ENABLED, "true");
-    ServerConfiguration.set(PropertyKey.SECURITY_AUTHORIZATION_PLUGINS_ENABLED, "true");
+    ServerConfiguration.set(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_ENABLED, "true");
 
     sTree.initializeRoot(TEST_USER_ADMIN.getUser(), TEST_USER_ADMIN.getGroup(), TEST_NORMAL_MODE,
             NoopJournalContext.INSTANCE);
@@ -264,7 +265,7 @@ public final class ExtensionInodeAttributesProviderTest {
         MountContext.defaults().getOptions().build());
     if (masterPlugin) {
       ServerConfiguration.set(
-          alluxio.conf.PropertyKey.SECURITY_AUTHORIZATION_PLUGIN_NAME, "test-plugin");
+          TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_NAME, "test-plugin");
       mMasterProvider = mock(InodeAttributesProvider.class);
       mMasterEnforcer = mock(AccessControlEnforcer.class);
       when(mFactory.createMasterProvider()).thenReturn(mMasterProvider);

@@ -13,6 +13,7 @@ package alluxio.security.group.provider;
 
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.PropertyKey;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.ExceptionMessage;
 import alluxio.retry.CountingRetry;
 import alluxio.security.group.GroupMappingService;
@@ -102,23 +103,23 @@ public final class LdapGroupsMapping implements GroupMappingService {
   public LdapGroupsMapping(AlluxioConfiguration conf) {
     mConf = conf;
     mGroupNameAttr =
-        mConf.get(PropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_GROUP_NAME);
+        mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_GROUP_NAME);
     mPosixUidAttr =
-        mConf.get(PropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_UID);
+        mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_UID);
     mPosixGidAttr =
-        mConf.get(PropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_GID);
+        mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_GID);
     SEARCH_CONTROLS.setTimeLimit(
-        mConf.getInt(PropertyKey.SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT));
+        mConf.getInt(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT));
     // Limit the attributes returned to only those required to speed up the search.
     // See HADOOP-10626 and HADOOP-12001 for more details.
     SEARCH_CONTROLS.setReturningAttributes(
         new String[] {mGroupNameAttr, mPosixUidAttr, mPosixGidAttr});
-    mSearchBase = mConf.get(PropertyKey.SECURITY_GROUP_MAPPING_LDAP_BASE);
+    mSearchBase = mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_BASE);
     LOG.info("LDAP search base = " + mSearchBase);
-    mUserSearchFilter = mConf.get(PropertyKey.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_USER);
+    mUserSearchFilter = mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_USER);
     LOG.info("user query = " + mUserSearchFilter);
     mGroupSearchFilter =
-        mConf.get(PropertyKey.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_GROUP);
+        mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_GROUP);
     mIsPosix = mGroupSearchFilter.contains(POSIX_GROUP)
         && (mUserSearchFilter.contains(POSIX_ACCOUNT)
             || mUserSearchFilter.contains(INET_ORG_PERSON));
@@ -127,7 +128,7 @@ public final class LdapGroupsMapping implements GroupMappingService {
           mGroupSearchFilter, mPosixGidAttr, mPosixUidAttr);
     } else {
       String groupMemberAttr =
-          mConf.get(PropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER);
+          mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER);
       mGroupQuery = String.format("(&%s(%s={0}))", mGroupSearchFilter, groupMemberAttr);
     }
     LOG.info("group query = " + mGroupQuery);
@@ -206,22 +207,22 @@ public final class LdapGroupsMapping implements GroupMappingService {
     Hashtable<String, String> env = new Hashtable<>();
     env.put("java.naming.factory.initial", LdapCtxFactory.class.getName());
     env.put("java.naming.provider.url",
-        mConf.get(PropertyKey.SECURITY_GROUP_MAPPING_LDAP_URL));
-    if (mConf.isSet(PropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL) && mConf.getBoolean(
-        PropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL)) {
+        mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_URL));
+    if (mConf.isSet(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL) && mConf.getBoolean(
+        TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL)) {
       env.put("java.naming.security.protocol", SSL);
       System.setProperty(SSL_KEYSTORE_KEY,
-          mConf.get(PropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE));
+          mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE));
       System.setProperty(SSL_KEYSTORE_PASSWORD_KEY,
-          getPassword(PropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD,
-              PropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD_FILE));
+          getPassword(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD,
+              TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD_FILE));
     }
     env.put("java.naming.security.authentication", SIMPLE_AUTHENTICATION);
     env.put("java.naming.security.principal",
-        mConf.get(PropertyKey.SECURITY_GROUP_MAPPING_LDAP_BIND_USER));
+        mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_BIND_USER));
     env.put("java.naming.security.credentials",
-        getPassword(PropertyKey.SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD,
-            PropertyKey.SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD_FILE));
+        getPassword(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD,
+            TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD_FILE));
     return new InitialDirContext(env);
   }
 

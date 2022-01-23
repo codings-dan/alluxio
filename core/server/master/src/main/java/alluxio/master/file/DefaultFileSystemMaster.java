@@ -29,6 +29,7 @@ import alluxio.conf.PropertyKey;
 import alluxio.conf.Reconfigurable;
 import alluxio.conf.ReconfigurableRegistry;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AccessControlException;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.BlockInfoException;
@@ -477,7 +478,7 @@ public final class DefaultFileSystemMaster extends CoreMaster
         return Type.STATE_LOCK_TRACKER;
       }
     };
-    if (ServerConfiguration.getBoolean(PropertyKey.SECURITY_AUTHORIZATION_PLUGINS_ENABLED)) {
+    if (ServerConfiguration.getBoolean(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_ENABLED)) {
       AbstractInodeAttributesProviderFactory authProviderFactory =
           new AbstractInodeAttributesProviderFactory();
       mUfsManager.registerUfsServiceFactory(InodeAttributesProvider.class, authProviderFactory);
@@ -3568,9 +3569,9 @@ public final class DefaultFileSystemMaster extends CoreMaster
     if ((!options.hasSyncIntervalMs() || options.getSyncIntervalMs() < 0)
         && ServerConfiguration.getMs(PropertyKey.USER_FILE_METADATA_SYNC_INTERVAL) < 0) {
       if (ServerConfiguration.getList(
-          PropertyKey.MASTER_FILE_METADATA_SYNC_LIST, ",").contains(path.getPath())) {
+          TxPropertyKey.MASTER_FILE_METADATA_SYNC_LIST, ",").contains(path.getPath())) {
         options = options.toBuilder().setSyncIntervalMs(ServerConfiguration.getMs(
-            PropertyKey.MASTER_FILE_METADATA_SYNC_INTERVAL)).build();
+            TxPropertyKey.MASTER_FILE_METADATA_SYNC_INTERVAL)).build();
       }
     }
     LockingScheme syncScheme = createSyncLockingScheme(path, options, isGetFileInfo);

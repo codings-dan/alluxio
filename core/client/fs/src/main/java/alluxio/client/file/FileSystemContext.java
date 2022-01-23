@@ -25,6 +25,7 @@ import alluxio.client.metrics.MetricsHeartbeatContext;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ReconfigurableRegistry;
+import alluxio.conf.TxPropertyKey;
 import alluxio.conf.path.SpecificPathConfiguration;
 import alluxio.exception.ExceptionMessage;
 import alluxio.exception.status.AlluxioStatusException;
@@ -273,7 +274,7 @@ public class FileSystemContext implements Closeable {
         .setMasterInquireClient(masterInquireClient).build();
     mMetricsEnabled = getClusterConf().getBoolean(PropertyKey.USER_METRICS_COLLECTION_ENABLED);
     mCommandHeartbeatEnabled = getClusterConf()
-        .getBoolean(PropertyKey.USER_COMMAND_HEARTBEAT_ENABLED);
+        .getBoolean(TxPropertyKey.USER_COMMAND_HEARTBEAT_ENABLED);
     if (mMetricsEnabled) {
       MetricsSystem.startSinks(getClusterConf().get(PropertyKey.METRICS_CONF_FILE));
       MetricsHeartbeatContext.addHeartbeat(getClientContext(), masterInquireClient);

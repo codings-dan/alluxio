@@ -14,6 +14,7 @@ package alluxio.client.file;
 import alluxio.AlluxioURI;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.PropertyKey;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.FileAlreadyExistsException;
 import alluxio.exception.FileDoesNotExistException;
@@ -72,7 +73,7 @@ public class MetadataCachingBaseFileSystem extends BaseFileSystem {
     long expirationTimeMs = mFsContext.getClusterConf()
         .getMs(PropertyKey.USER_METADATA_CACHE_EXPIRATION_TIME);
     boolean commandHeartbeatEnabled =
-        context.getClusterConf().getBoolean(PropertyKey.USER_COMMAND_HEARTBEAT_ENABLED);
+        context.getClusterConf().getBoolean(TxPropertyKey.USER_COMMAND_HEARTBEAT_ENABLED);
     mMetadataCache = new MetadataCache(maxSize, expirationTimeMs, commandHeartbeatEnabled);
     int masterClientThreads = mFsContext.getClusterConf()
         .getInt(PropertyKey.USER_FILE_MASTER_CLIENT_POOL_SIZE_MAX);

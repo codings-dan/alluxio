@@ -18,9 +18,9 @@ import static org.junit.Assert.assertTrue;
 
 import alluxio.conf.AlluxioProperties;
 import alluxio.conf.InstancedConfiguration;
-import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
 import alluxio.conf.Source;
+import alluxio.conf.TxPropertyKey;
 import alluxio.master.file.InodeAttributesProvider;
 import alluxio.master.file.meta.MountTable;
 import alluxio.security.authorization.AuthorizationPluginConstants;
@@ -40,24 +40,24 @@ public class HdfsInodeAttributesProviderFactoryTest {
   public void factory() {
     HdfsInodeAttributesProviderFactory factory =
         new HdfsInodeAttributesProviderFactory();
-    ServerConfiguration.set(alluxio.conf.PropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME,
+    ServerConfiguration.set(TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME,
         AuthorizationPluginConstants.AUTH_VERSION);
     UnderFileSystemConfiguration conf =
         UnderFileSystemConfiguration.defaults(ServerConfiguration.global());
     conf.merge(ImmutableMap.of(DFS_NAMENODE_INODE_ATTRIBUTES_PROVIDER_KEY,
             DummyHdfsProvider.class.getName()), Source.RUNTIME);
     conf.createMountSpecificConf(ImmutableMap.of(
-        alluxio.conf.PropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME.getName(),
+        TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME.getName(),
         AuthorizationPluginConstants.AUTH_VERSION,
         DFS_NAMENODE_INODE_ATTRIBUTES_PROVIDER_KEY,
         DummyHdfsProvider.class.getName()));
     UnderFileSystemConfiguration invalidConf =
         UnderFileSystemConfiguration.defaults(ServerConfiguration.global());
     invalidConf.createMountSpecificConf(ImmutableMap.of(
-        PropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME.getName(), "invalid-1.0",
+        TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME.getName(), "invalid-1.0",
         DFS_NAMENODE_INODE_ATTRIBUTES_PROVIDER_KEY,
         DummyHdfsProvider.class.getName()));
-    String s = ServerConfiguration.get(PropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME);
+    String s = ServerConfiguration.get(TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME);
     System.out.println(s.charAt(3));
     assertTrue(factory.supportsPath(MountTable.ROOT, conf));
     assertTrue(factory.supportsPath("hdfs://localhost/test/path", conf));
@@ -70,7 +70,7 @@ public class HdfsInodeAttributesProviderFactoryTest {
     assertFalse(factory.supportsPath("o3fs://vol1.bucket1/test/path", conf));
     assertFalse(factory.supportsPath("o3fs://vol1.bucket1.tdw/test/path", conf));
     assertFalse(factory.supportsPath("o3fs://vol1.bucket.1.1.1.1:9999/test/path", conf));
-    conf.set(PropertyKey.SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED, "true");
+    conf.set(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED, "true");
     assertTrue(factory.supportsPath("hdfs://localhost/test/path", conf));
     assertFalse(factory.supportsPath("s3a://bucket/test/path", conf));
     assertTrue(factory.supportsPath("o3fs://vol1.bucket1/test/path", conf));
@@ -83,12 +83,12 @@ public class HdfsInodeAttributesProviderFactoryTest {
 
   private boolean supportsPath(String path, @Nullable UnderFileSystemConfiguration ufsConf) {
     ServerConfiguration.set(
-        alluxio.conf.PropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME, "invalid-1.0");
+        TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME, "invalid-1.0");
     boolean isHdfs = ServerConfiguration.getList(
         alluxio.conf.PropertyKey.UNDERFS_HDFS_PREFIXES, ",")
         .stream().anyMatch(path::startsWith);
     return ufsConf != null && AuthorizationPluginConstants.AUTH_VERSION.equalsIgnoreCase(
-        ServerConfiguration.get(PropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME))
+        ServerConfiguration.get(TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME))
         && (isHdfs || path.equals(MountTable.ROOT));
   }
 
@@ -97,9 +97,9 @@ public class HdfsInodeAttributesProviderFactoryTest {
     InstancedConfiguration instancedConfiguration =
         new InstancedConfiguration(new AlluxioProperties());
     instancedConfiguration.set(
-        alluxio.conf.PropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME, "1111111");
+        TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME, "1111111");
     String s = instancedConfiguration.get(
-        alluxio.conf.PropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME);
+        TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME);
     System.out.println(s.charAt(6));
   }
 }

@@ -14,6 +14,7 @@ package alluxio.security.authorization.hadoop;
 import alluxio.Constants;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.master.file.meta.MountTable;
 import alluxio.security.authorization.AuthorizationPluginConstants;
 import alluxio.master.file.InodeAttributesProvider;
@@ -45,8 +46,9 @@ public final class HdfsInodeAttributesProviderFactory implements InodeAttributes
     boolean isHdfs = ServerConfiguration.getList(alluxio.conf.PropertyKey.UNDERFS_HDFS_PREFIXES,
         ",").stream().anyMatch(path::startsWith);
     boolean allowCompatibleOzone = conf != null
-        && conf.isSet(PropertyKey.SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED)
-        && conf.getBoolean(PropertyKey.SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED);
+        && conf.isSet(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED)
+        && conf.getBoolean(
+            TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED);
     boolean isOzone = path.startsWith(Constants.HEADER_OZONE);
 
     if (isHdfs) {
@@ -55,13 +57,13 @@ public final class HdfsInodeAttributesProviderFactory implements InodeAttributes
           LOG.info("HdfsInodeAttributesProviderFactory.supportsPath for Prefixes is：{}", item));
       if (conf != null) {
         LOG.info("HdfsInodeAttributesProviderFactory.supportsPath for Security Authorization Plugin"
-            + " Name is：{}", conf.get(PropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME));
+            + " Name is：{}", conf.get(TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME));
       }
     }
     LOG.info("allow HDFS compatible Ozone {} isOzone path {}", allowCompatibleOzone, isOzone);
 
     return conf != null && AuthorizationPluginConstants.AUTH_VERSION.equalsIgnoreCase(
-        conf.get(PropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME))
+        conf.get(TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME))
         && ((isHdfs || allowCompatibleOzone && isOzone) || path.equals(MountTable.ROOT));
   }
 }

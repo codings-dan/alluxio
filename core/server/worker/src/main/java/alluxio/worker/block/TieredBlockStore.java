@@ -13,6 +13,7 @@ package alluxio.worker.block;
 
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.BlockAlreadyExistsException;
 import alluxio.exception.BlockDoesNotExistException;
 import alluxio.exception.ExceptionMessage;
@@ -633,7 +634,7 @@ public class TieredBlockStore implements BlockStore {
           return dirView;
         }
         if (options.isEvictionAllowed() && ServerConfiguration
-            .getBoolean(PropertyKey.WORKER_BLOCK_ANNOTATOR_ENABLED)) {
+            .getBoolean(TxPropertyKey.WORKER_BLOCK_ANNOTATOR_ENABLED)) {
           LOG.debug("Free space for block expansion: freeing {} bytes on {}. ",
                   options.getSize(), options.getLocation());
           freeSpace(sessionId, options.getSize(), options.getSize(), options.getLocation());
@@ -672,7 +673,7 @@ public class TieredBlockStore implements BlockStore {
         }
 
         if (options.isEvictionAllowed() && ServerConfiguration
-            .getBoolean(PropertyKey.WORKER_BLOCK_ANNOTATOR_ENABLED)) {
+            .getBoolean(TxPropertyKey.WORKER_BLOCK_ANNOTATOR_ENABLED)) {
           // There is no space left on worker.
           // Free more than requested by configured free-ahead size.
           long toFreeBytes = options.getSize() + FREE_AHEAD_BYTETS;

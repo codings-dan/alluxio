@@ -33,6 +33,7 @@ import alluxio.conf.AlluxioProperties;
 import alluxio.conf.InstancedConfiguration;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AccessControlException;
 import alluxio.exception.BlockInfoException;
 import alluxio.exception.DirectoryNotEmptyException;
@@ -198,7 +199,7 @@ public final class FileSystemMasterTest {
           AlluxioTestDirectory.createTemporaryDirectory("workdir").getAbsolutePath());
       put(PropertyKey.MASTER_MOUNT_TABLE_ROOT_UFS, AlluxioTestDirectory
           .createTemporaryDirectory("FileSystemMasterTest").getAbsolutePath());
-      put(alluxio.conf.PropertyKey.SECURITY_AUTHORIZATION_PLUGINS_ENABLED, "true");
+      put(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_ENABLED, "true");
       put(PropertyKey.MASTER_FILE_SYSTEM_OPERATION_RETRY_CACHE_ENABLED, "false");
     }
   }, ServerConfiguration.global());

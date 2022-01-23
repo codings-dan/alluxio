@@ -12,7 +12,7 @@
 package alluxio.master.file;
 
 import alluxio.conf.ServerConfiguration;
-import alluxio.conf.PropertyKey;
+import alluxio.conf.TxPropertyKey;
 import alluxio.extensions.ClassLoaderContext;
 import alluxio.extensions.ExtensionFactoryRegistry;
 import alluxio.extensions.ExtensionsClassLoader;
@@ -56,19 +56,19 @@ public class AbstractInodeAttributesProviderFactory implements UfsServiceFactory
    * @return the provider
    */
   public InodeAttributesProvider createMasterProvider() {
-    if (ServerConfiguration.isSet(PropertyKey.SECURITY_AUTHORIZATION_PLUGIN_NAME)) {
+    if (ServerConfiguration.isSet(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_NAME)) {
       try {
         String pluginName =
-                ServerConfiguration.get(PropertyKey.SECURITY_AUTHORIZATION_PLUGIN_NAME);
+                ServerConfiguration.get(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_NAME);
         String pluginPaths =
-                ServerConfiguration.get(PropertyKey.SECURITY_AUTHORIZATION_PLUGIN_PATHS);
+                ServerConfiguration.get(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_PATHS);
         LOG.info("Initializing Alluxio master authorization for pluginName: {} ,pluginPaths: {} ",
             pluginName, pluginPaths);
         UnderFileSystemConfiguration ufsConf = UnderFileSystemConfiguration.defaults(
             ServerConfiguration.global());
         ufsConf = ufsConf.createMountSpecificConf(ImmutableMap.of(
-            PropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME.getName(), pluginName,
-            PropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS.getName(), pluginPaths
+            TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME.getName(), pluginName,
+            TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS.getName(), pluginPaths
         ));
         return create("/", ufsConf);
       } catch (Exception e) {
@@ -100,7 +100,7 @@ public class AbstractInodeAttributesProviderFactory implements UfsServiceFactory
         if (pluginClassLoader instanceof ExtensionsClassLoader) {
           ExtensionsClassLoader extLoader = (ExtensionsClassLoader) pluginClassLoader;
           String pluginPaths =
-              ufsConf.get(PropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS);
+              ufsConf.get(TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS);
           Arrays.stream(pluginPaths.split(":")).forEachOrdered(pluginPath -> {
             try {
               LOG.info("Adding plugin path {}", pluginPath);
@@ -141,7 +141,7 @@ public class AbstractInodeAttributesProviderFactory implements UfsServiceFactory
   public <T extends UfsService> T createUfsService(String path,
       UnderFileSystemConfiguration ufsConf, Class<T> serviceType) {
     if (serviceType != InodeAttributesProvider.class
-        || !ufsConf.isSet(PropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS)) {
+        || !ufsConf.isSet(TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS)) {
       return null;
     }
     return (T) create(path, ufsConf);

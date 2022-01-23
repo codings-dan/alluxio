@@ -16,6 +16,7 @@ import alluxio.Constants;
 import alluxio.annotation.PublicApi;
 import alluxio.client.file.URIStatus;
 import alluxio.conf.PropertyKey;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.InvalidPathException;
 import alluxio.grpc.DeletePOptions;
@@ -82,9 +83,9 @@ public class ShimFileSystem extends AbstractFileSystem {
 
   public synchronized void initialize(URI uri, Configuration conf) throws IOException {
     super.initialize(uri, conf);
-    if (mAlluxioConf.isSet(PropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST)) {
+    if (mAlluxioConf.isSet(TxPropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST)) {
       List<String> prefixes =
-          mAlluxioConf.getList(PropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST, ",");
+          mAlluxioConf.getList(TxPropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST, ",");
       try {
         for (String prefix : prefixes) {
           prefix = prefix.trim();
@@ -94,7 +95,7 @@ public class ShimFileSystem extends AbstractFileSystem {
         }
       } catch (URISyntaxException e) {
         throw new IOException(String.format("By-pass configuration not correct: %s",
-            mAlluxioConf.get(PropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST)), e);
+            mAlluxioConf.get(TxPropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST)), e);
       }
     }
     if (!mByPassedPrefixSet.isEmpty()) {

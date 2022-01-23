@@ -1504,48 +1504,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
-  //
-  // Shimfs  related properties
-  //
-  public static final PropertyKey MASTER_SHIMFS_AUTO_MOUNT_ENABLED =
-      new Builder(Name.MASTER_SHIMFS_AUTO_MOUNT_ENABLED)
-          .setDescription("If enabled, Alluxio will attempt to mount UFS for foreign URIs.")
-          .setDefaultValue(Boolean.valueOf(false))
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
-          .setScope(Scope.MASTER)
-          .build();
-  public static final PropertyKey MASTER_SHIMFS_AUTO_MOUNT_ROOT =
-      new Builder(Name.MASTER_SHIMFS_AUTO_MOUNT_ROOT)
-          .setDescription("Alluxio root path for auto-mounted UFSes. "
-              + "This directory should already exist in Alluxio.")
-          .setDefaultValue("/auto-mount")
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
-          .setScope(Scope.MASTER)
-          .build();
-  public static final PropertyKey MASTER_SHIMFS_AUTO_MOUNT_READONLY =
-      new Builder(Name.MASTER_SHIMFS_AUTO_MOUNT_READONLY)
-          .setDescription("If true, UFSes are auto-mounted as read-only.")
-          .setDefaultValue(Boolean.valueOf(true))
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
-          .setScope(Scope.MASTER)
-          .build();
-  public static final PropertyKey MASTER_SHIMFS_AUTO_MOUNT_SHARED =
-      new Builder(Name.MASTER_SHIMFS_AUTO_MOUNT_SHARED)
-          .setDescription("If true, UFSes are auto-mounted as shared.")
-          .setDefaultValue(Boolean.valueOf(false))
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
-          .setScope(Scope.MASTER)
-          .build();
-  public static final PropertyKey USER_SHIMFS_BYPASS_PREFIX_LIST =
-      new Builder(Name.USER_SHIMFS_BYPASS_PREFIX_LIST)
-          .setDescription("A comma-separated list of prefix paths to by-pass. "
-              + "User classpath should contain a native hadoop FileSystem implementation"
-              + " for target scheme. \n"
-              + String.format("For example: \"%s=s3://bucket1/foo, s3://bucket1/bar\"",
-                  Name.USER_SHIMFS_BYPASS_PREFIX_LIST))
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
-          .setScope(Scope.CLIENT)
-          .build();
 
   /**
    * Master related properties.
@@ -2235,13 +2193,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setDescription("The maximum time to wait for ufs journal catching up "
               + "before listening to Zookeeper state change. This is added to prevent "
               + "frequently leadership transition during heavy journal replay stage.")
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
-          .setScope(Scope.MASTER)
-          .build();
-  public static final PropertyKey MASTER_URI_TRANSLATOR_IMPL =
-      new Builder(Name.MASTER_URI_TRANSLATOR_IMPL)
-          .setDefaultValue("alluxio.master.file.uritranslator.DefaultUriTranslator")
-          .setDescription("The class of uri translator implementation.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
@@ -3118,14 +3069,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setDefaultValue(0.25)
           .setDescription("A factor in [0, 1] to control the behavior of LRFU: smaller value "
               + "makes LRFU more similar to LFU; and larger value makes LRFU closer to LRU.")
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
-          .setScope(Scope.WORKER)
-          .build();
-  public static final PropertyKey WORKER_BLOCK_ANNOTATOR_ENABLED =
-      new Builder(Name.WORKER_BLOCK_ANNOTATOR_ENABLED)
-          .setDefaultValue(true)
-          .setDescription("If false, the worker will not evict when insufficient space for "
-              + "worker.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.WORKER)
           .build();
@@ -4427,27 +4370,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
-  public static final PropertyKey MASTER_FILE_METADATA_SYNC_INTERVAL =
-      new Builder(Name.MASTER_FILE_METADATA_SYNC_INTERVAL)
-          .setDefaultValue("-1")
-          .setDescription("The interval for syncing UFS metadata before invoking an "
-              + "operation on a path. -1 means no sync will occur. 0 means Alluxio will "
-              + "always sync the metadata of the path before an operation. If you specify a time "
-              + "interval, Alluxio will (best effort) not re-sync a path within that time "
-              + "interval. Syncing the metadata for a path must interact with the UFS, so it is "
-              + "an expensive operation. If a sync is performed for an operation, the "
-              + "configuration of \"alluxio.master.file.metadata.sync.list\" should be set.")
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
-          .setScope(Scope.MASTER)
-          .build();
-  public static final PropertyKey MASTER_FILE_METADATA_SYNC_LIST =
-      new Builder(Name.MASTER_FILE_METADATA_SYNC_LIST)
-          .setDefaultValue("")
-          .setDescription("A comma-separated list of the paths which are "
-              + "configured to be synced, separated by semi-colons.")
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
-          .setScope(Scope.MASTER)
-          .build();
   public static final PropertyKey USER_FILE_PASSIVE_CACHE_ENABLED =
       new Builder(Name.USER_FILE_PASSIVE_CACHE_ENABLED)
           .setDefaultValue(true)
@@ -4832,22 +4754,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setDefaultValue("10sec")
           .setDescription("The time period of client master heartbeat to "
               + "send the client-side metrics.")
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
-          .setScope(Scope.CLIENT)
-          .build();
-  public static final PropertyKey USER_COMMAND_HEARTBEAT_ENABLED =
-      new Builder(Name.USER_COMMAND_HEARTBEAT_ENABLED)
-          .setDefaultValue(false)
-          .setDescription("Enable client get journal index from master")
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
-          .setScope(Scope.CLIENT)
-          .build();
-  public static final PropertyKey USER_COMMAND_HEARTBEAT_INTERVAL_MS =
-      new Builder(Name.USER_COMMAND_HEARTBEAT_INTERVAL_MS)
-          .setAlias("alluxio.user.command.heartbeat.interval.ms")
-          .setDefaultValue("5min")
-          .setDescription("The time period of client master heartbeat to "
-              + "get the journal index from master.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
@@ -5613,15 +5519,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setScope(Scope.ALL)
           .setIsHidden(true)
           .build();
-  public static final PropertyKey SECURITY_PERMISSION_CHECKER_CUSTOM_PROVIDER_CLASS =
-      new Builder(Name.SECURITY_PERMISSION_CHECKER_CUSTOM_PROVIDER_CLASS)
-          .setDescription("The class to provide customized permission checker implementation. "
-              + "It must implement the interface "
-              + "'alluxio.master.file.PermissionChecker'.")
-          .setDefaultValue("alluxio.master.file.DefaultPermissionChecker")
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
-          .setScope(Scope.MASTER)
-          .build();
 
   //
   // Yarn related properties
@@ -5667,112 +5564,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
       new Builder(Name.UNDERFS_VERSION)
           .setDefaultValue("3.3.0")
           .setIsHidden(true)
-          .build();
-  public static final PropertyKey UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME =
-      new Builder(Name.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME)
-          .setDescription("Name of the authorization plugin for the under filesystem.")
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
-          .setScope(Scope.MASTER)
-          .build();
-  public static final PropertyKey UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS =
-      new PropertyKey.Builder(PropertyKey.Name.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS)
-          .setDescription("Classpaths for the under filesystem authorization plugin,"
-              + " separated by colons.")
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
-          .setScope(Scope.MASTER)
-          .build();
-  public static final PropertyKey SECURITY_AUTHORIZATION_PLUGIN_NAME =
-      new Builder(Name.SECURITY_AUTHORIZATION_PLUGIN_NAME)
-          .setDescription("Plugin for master authorization.")
-          .setConsistencyCheckLevel(PropertyKey.ConsistencyCheckLevel.ENFORCE)
-          .setScope(Scope.MASTER)
-          .build();
-  public static final PropertyKey SECURITY_AUTHORIZATION_PLUGIN_PATHS =
-      new Builder(Name.SECURITY_AUTHORIZATION_PLUGIN_PATHS)
-          .setDescription("Classpath for master authorization plugin, separated by colons.")
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
-          .setScope(Scope.MASTER)
-          .build();
-  public static final PropertyKey SECURITY_AUTHORIZATION_PLUGINS_ENABLED =
-      new Builder(Name.SECURITY_AUTHORIZATION_PLUGINS_ENABLED)
-          .setDefaultValue(false)
-          .setDescription("Enable plugins for authorization.")
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
-          .setScope(Scope.MASTER)
-          .build();
-  public static final PropertyKey SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED =
-      new Builder(Name.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)
-          .setDefaultValue(false)
-          .setDescription("Enable convert to external ufs namespace Uri.")
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
-          .setScope(Scope.MASTER)
-          .build();
-  public static final PropertyKey SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED =
-      new Builder(Name.SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED)
-          .setDefaultValue(false)
-          .setDescription("enable HDFS authorization plugin compatible with ozone")
-          .setConsistencyCheckLevel(PropertyKey.ConsistencyCheckLevel.ENFORCE)
-          .setScope(Scope.MASTER)
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_URL =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_URL)
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SSL =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL)
-          .setDefaultValue(false)
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE)
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD)
-          .setDisplayType(DisplayType.CREDENTIALS)
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD_FILE =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD_FILE)
-          .setDisplayType(DisplayType.CREDENTIALS)
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_BIND_USER =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_BIND_USER)
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD)
-          .setDisplayType(DisplayType.CREDENTIALS)
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD_FILE =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD_FILE)
-          .setDisplayType(DisplayType.CREDENTIALS)
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_BASE =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_BASE)
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_USER =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_USER)
-          .setDefaultValue("(&(objectClass=user)(sAMAccountName={0}))")
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_GROUP =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_GROUP)
-          .setDefaultValue("(objectClass=group)")
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT)
-          .setDefaultValue("10000")
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER)
-          .setDefaultValue("member")
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_ATTR_GROUP_NAME =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_GROUP_NAME)
-          .setDefaultValue("cn")
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_UID =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_UID)
-          .setDefaultValue("uidNumber")
-          .build();
-  public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_GID =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_GID)
-          .setDefaultValue("gidNumber")
           .build();
 
   //
@@ -6367,14 +6158,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     public static final String UNDERFS_WEB_PARENT_NAMES = "alluxio.underfs.web.parent.names";
     public static final String UNDERFS_WEB_TITLES = "alluxio.underfs.web.titles";
     public static final String UNDERFS_VERSION = "alluxio.underfs.version";
-    public static final String UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME =
-        "alluxio.underfs.security.authorization.plugin.name";
-    public static final String UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS =
-        "alluxio.underfs.security.authorization.plugin.paths";
-    public static final String SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED =
-        "alluxio.security.authorization.plugins.external.ufs.namespace.enabled";
-    public static final String SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED =
-        "alluxio.security.authorization.plugin.hdfs.compatible.ozone.enabled";
     public static final String UNDERFS_OBJECT_STORE_BREADCRUMBS_ENABLED =
         "alluxio.underfs.object.store.breadcrumbs.enabled";
     public static final String UNDERFS_OBJECT_STORE_SERVICE_THREADS =
@@ -6776,8 +6559,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
         "alluxio.master.update.check.enabled";
     public static final String MASTER_UPDATE_CHECK_INTERVAL =
         "alluxio.master.update.check.interval";
-    public static final String MASTER_URI_TRANSLATOR_IMPL =
-        "alluxio.master.uri.translator.impl";
     public static final String MASTER_WEB_BIND_HOST = "alluxio.master.web.bind.host";
     public static final String MASTER_WEB_HOSTNAME = "alluxio.master.web.hostname";
     public static final String MASTER_WEB_PORT = "alluxio.master.web.port";
@@ -6798,16 +6579,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
         "alluxio.master.journal.gc.threshold";
     public static final String MASTER_JOURNAL_TEMPORARY_FILE_GC_THRESHOLD_MS =
         "alluxio.master.journal.temporary.file.gc.threshold";
-    public static final String MASTER_SHIMFS_AUTO_MOUNT_ENABLED =
-        "alluxio.master.shimfs.auto.mount.enabled";
-    public static final String MASTER_SHIMFS_AUTO_MOUNT_ROOT =
-        "alluxio.master.shimfs.auto.mount.root";
-    public static final String MASTER_SHIMFS_AUTO_MOUNT_READONLY =
-        "alluxio.master.shimfs.auto.mount.readonly";
-    public static final String MASTER_SHIMFS_AUTO_MOUNT_SHARED =
-        "alluxio.master.shimfs.auto.mount.shared";
-    public static final String USER_SHIMFS_BYPASS_PREFIX_LIST =
-        "alluxio.user.shimfs.bypass.prefix.list";
     public static final String MASTER_WORKER_REGISTER_LEASE_ENABLED =
         "alluxio.master.worker.register.lease.enabled";
     public static final String MASTER_WORKER_REGISTER_LEASE_COUNT =
@@ -6860,8 +6631,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
         "alluxio.worker.block.annotator.lrfu.attenuation.factor";
     public static final String WORKER_BLOCK_ANNOTATOR_LRFU_STEP_FACTOR =
         "alluxio.worker.block.annotator.lrfu.step.factor";
-    public static final String WORKER_BLOCK_ANNOTATOR_ENABLED =
-        "alluxio.worker.block.annotator.enabled";
     public static final String WORKER_FUSE_ENABLED =
         "alluxio.worker.fuse.enabled";
     public static final String WORKER_FUSE_MOUNT_ALLUXIO_PATH =
@@ -7152,10 +6921,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
         "alluxio.user.file.metadata.load.type";
     public static final String USER_FILE_METADATA_SYNC_INTERVAL =
         "alluxio.user.file.metadata.sync.interval";
-    public static final String MASTER_FILE_METADATA_SYNC_INTERVAL =
-        "alluxio.master.file.metadata.sync.interval";
-    public static final String MASTER_FILE_METADATA_SYNC_LIST =
-        "alluxio.master.file.metadata.sync.list";
     public static final String USER_FILE_PASSIVE_CACHE_ENABLED =
         "alluxio.user.file.passive.cache.enabled";
     public static final String USER_FILE_READ_TYPE_DEFAULT = "alluxio.user.file.readtype.default";
@@ -7204,10 +6969,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
         "alluxio.user.metrics.collection.enabled";
     public static final String USER_METRICS_HEARTBEAT_INTERVAL_MS =
         "alluxio.user.metrics.heartbeat.interval";
-    public static final String USER_COMMAND_HEARTBEAT_ENABLED =
-        "alluxio.user.command.heartbeat.enabled";
-    public static final String USER_COMMAND_HEARTBEAT_INTERVAL_MS =
-        "alluxio.user.command.heartbeat.interval.ms";
     public static final String USER_APP_ID = "alluxio.user.app.id";
     public static final String USER_NETWORK_DATA_TIMEOUT =
         "alluxio.user.network.data.timeout";
@@ -7347,12 +7108,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     //
     // Security related properties
     //
-    public static final String SECURITY_AUTHORIZATION_PLUGIN_NAME =
-        "alluxio.security.authorization.plugin.name";
-    public static final String SECURITY_AUTHORIZATION_PLUGIN_PATHS =
-        "alluxio.security.authorization.plugin.paths";
-    public static final String SECURITY_AUTHORIZATION_PLUGINS_ENABLED =
-        "alluxio.security.authorization.plugins.enabled";
     public static final String SECURITY_AUTHENTICATION_CUSTOM_PROVIDER_CLASS =
         "alluxio.security.authentication.custom.provider.class";
     public static final String SECURITY_AUTHENTICATION_TYPE =
@@ -7372,40 +7127,6 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     public static final String SECURITY_LOGIN_USERNAME = "alluxio.security.login.username";
     public static final String AUTHENTICATION_INACTIVE_CHANNEL_REAUTHENTICATE_PERIOD =
         "alluxio.security.stale.channel.purge.interval";
-    public static final String SECURITY_PERMISSION_CHECKER_CUSTOM_PROVIDER_CLASS =
-        "alluxio.security.permission.checker.custom.provider.class";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_URL =
-        "alluxio.security.group.mapping.ldap.url";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_SSL =
-        "alluxio.security.group.mapping.ldap.ssl";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE =
-        "alluxio.security.group.mapping.ldap.ssl.keystore";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD =
-        "alluxio.security.group.mapping.ldap.ssl.keystore.password";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD_FILE =
-        "alluxio.security.group.mapping.ldap.ssl.keystore.password.file";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_BIND_USER =
-        "alluxio.security.group.mapping.ldap.bind.user";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD =
-        "alluxio.security.group.mapping.ldap.bind.password";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD_FILE =
-        "alluxio.security.group.mapping.ldap.bind.password.file";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_BASE =
-        "alluxio.security.group.mapping.ldap.base";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_USER =
-        "alluxio.security.group.mapping.ldap.search.filter.user";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_GROUP =
-        "alluxio.security.group.mapping.ldap.search.filter.group";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT =
-        "alluxio.security.group.mapping.ldap.search.timeout";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER =
-        "alluxio.security.group.mapping.ldap.attr.member";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_ATTR_GROUP_NAME =
-        "alluxio.security.group.mapping.ldap.attr.group.name";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_UID =
-        "alluxio.security.group.mapping.ldap.attr.posix.uid";
-    public static final String SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_GID =
-        "alluxio.security.group.mapping.ldap.attr.posix.gid";
 
     //
     // Network TLS support

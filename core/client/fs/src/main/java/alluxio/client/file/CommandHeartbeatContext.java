@@ -13,7 +13,7 @@ package alluxio.client.file;
 
 import alluxio.ClientContext;
 import alluxio.conf.AlluxioConfiguration;
-import alluxio.conf.PropertyKey;
+import alluxio.conf.TxPropertyKey;
 import alluxio.master.MasterInquireClient;
 import alluxio.util.ThreadFactoryUtils;
 
@@ -83,8 +83,8 @@ public class CommandHeartbeatContext {
     if (mCtxCount++ == 0) {
       mCommandMasterHeartbeatTask =
           sExecutorService.scheduleWithFixedDelay(this::heartbeat,
-              mConf.getMs(PropertyKey.USER_COMMAND_HEARTBEAT_INTERVAL_MS),
-              mConf.getMs(PropertyKey.USER_COMMAND_HEARTBEAT_INTERVAL_MS),
+              mConf.getMs(TxPropertyKey.USER_COMMAND_HEARTBEAT_INTERVAL_MS),
+              mConf.getMs(TxPropertyKey.USER_COMMAND_HEARTBEAT_INTERVAL_MS),
               TimeUnit.MILLISECONDS);
     }
   }
@@ -97,7 +97,7 @@ public class CommandHeartbeatContext {
         return;
       }
       long time = System.currentTimeMillis() - mFailHeartbeatTime;
-      long expirationTimeMs = mConf.getMs(PropertyKey.USER_COMMAND_HEARTBEAT_INTERVAL_MS);
+      long expirationTimeMs = mConf.getMs(TxPropertyKey.USER_COMMAND_HEARTBEAT_INTERVAL_MS);
       if (time >= expirationTimeMs) {
         LOG.info("Failed heartbeat in the past {} s , clear all metadata cache", time / 1000.0);
         mFs.dropMetadataCacheAll();

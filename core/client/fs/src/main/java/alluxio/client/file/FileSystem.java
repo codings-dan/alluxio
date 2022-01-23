@@ -20,6 +20,7 @@ import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.InstancedConfiguration;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.Source;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.DirectoryNotEmptyException;
 import alluxio.exception.FileAlreadyExistsException;
@@ -155,7 +156,7 @@ public interface FileSystem extends Closeable {
         }
       }
       boolean commandHeartbeatEnabled =
-          context.getClusterConf().getBoolean(PropertyKey.USER_COMMAND_HEARTBEAT_ENABLED);
+          context.getClusterConf().getBoolean(TxPropertyKey.USER_COMMAND_HEARTBEAT_ENABLED);
       FileSystem fs = conf.getBoolean(PropertyKey.USER_METADATA_CACHE_ENABLED)
           ? new MetadataCachingBaseFileSystem(context) : new BaseFileSystem(context);
       if (fs instanceof MetadataCachingBaseFileSystem && commandHeartbeatEnabled) {
