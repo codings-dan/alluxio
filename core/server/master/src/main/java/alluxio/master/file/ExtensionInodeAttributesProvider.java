@@ -13,6 +13,7 @@ package alluxio.master.file;
 
 import alluxio.AlluxioURI;
 import alluxio.Constants;
+import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
 import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AccessControlException;
@@ -22,10 +23,12 @@ import alluxio.master.file.meta.InodeAttributes;
 import alluxio.master.file.meta.InodeView;
 import alluxio.master.file.meta.MountTable;
 import alluxio.master.file.meta.MutableInode;
+import alluxio.master.file.meta.options.MountInfo;
 import alluxio.proto.journal.Journal;
 import alluxio.proto.meta.InodeMeta;
 import alluxio.security.authorization.DefaultAccessControlList;
 import alluxio.security.authorization.Mode;
+import alluxio.util.FormatUtils;
 import alluxio.util.io.PathUtils;
 import alluxio.wire.FileInfo;
 
@@ -195,9 +198,9 @@ public final class ExtensionInodeAttributesProvider implements InodeAttributesPr
       AlluxioURI ufsUri = resolution.getUri();
       InodeAttributesProvider ufsAuthProvider = getUfsProvider(mMountTable, alluxioUri);
       if (ufsAuthProvider != null) {
-        if (ServerConfiguration
-            .isSet(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)
-            && ServerConfiguration.getBoolean(
+        if (isSetMountOrGlobalConf(
+            resolution, TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)
+            && getMountOrGlobalConfBoolean(resolution,
             TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)) {
           ufsUri = convertToExternalUfsNameSpace(ufsUri);
         }
@@ -227,6 +230,37 @@ public final class ExtensionInodeAttributesProvider implements InodeAttributesPr
         mDefaultEnforcer.checkPermission(user, groups, bits, path, partialNodes, partialAttrs,
             checkIsOwner);
         LOG.debug("Passed default permission check for {}, bits {}", ufsUri, bits);
+      }
+    }
+
+    /**
+     * Checks if the mount properties or global configuration contains a value for the given key.
+     * @param resolution the mount table resolution of the path
+     * @param key the key to check
+     * @return true if there is value for the key, false otherwise
+     */
+    private boolean isSetMountOrGlobalConf(MountTable.Resolution resolution, PropertyKey key) {
+      MountInfo mountInfo = mMountTable.getMountInfo(resolution.getMountId());
+      Preconditions.checkNotNull(mountInfo, "checkUfsPermission");
+      return mountInfo.getOptions().getPropertiesMap().containsKey(key.toString())
+          || ServerConfiguration.isSet(key);
+    }
+
+    /**
+     * Get the value of the value specified by Mount, if you don't exist, get value in Global.
+     * @param resolution the mount table resolution of the path
+     * @return the properties backing this configuration
+     * @throws RuntimeException if value is not set in both properties and
+     *  global configuration for the given key
+     */
+    private boolean getMountOrGlobalConfBoolean(MountTable.Resolution resolution, PropertyKey key) {
+      MountInfo mountInfo = mMountTable.getMountInfo(resolution.getMountId());
+      Preconditions.checkNotNull(mountInfo, "checkUfsPermission");
+      if (mountInfo.getOptions().getPropertiesMap().containsKey(key.toString())) {
+        return FormatUtils.parseBoolean(
+            mountInfo.getOptions().getPropertiesMap().get(key.toString()));
+      } else {
+        return ServerConfiguration.global().getBoolean(key);
       }
     }
 
@@ -283,9 +317,9 @@ public final class ExtensionInodeAttributesProvider implements InodeAttributesPr
         List<T> inodes, BiFunction<String, T, T> createPassThroughFunc,
         MountTable.Resolution resolution) throws InvalidPathException {
       AlluxioURI ufsUrl = resolution.getUri();
-      if (ServerConfiguration
-          .isSet(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)
-          && ServerConfiguration.getBoolean(
+      if (isSetMountOrGlobalConf(
+          resolution, TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)
+          && getMountOrGlobalConfBoolean(resolution,
           TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)) {
         ufsUrl = convertToExternalUfsNameSpace(ufsUrl);
       }
