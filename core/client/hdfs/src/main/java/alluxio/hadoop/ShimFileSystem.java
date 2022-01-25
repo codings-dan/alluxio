@@ -403,6 +403,14 @@ public class ShimFileSystem extends AbstractFileSystem {
     return super.getContentSummary(path);
   }
 
+  @Override
+  public void close() throws IOException {
+    if (mByPassFs != null) {
+      mByPassFs.close();
+    }
+    super.close();
+  }
+
   @VisibleForTesting
   protected static Path getFullPath(URI uri, Path path) {
     URI pathUri = path.toUri();
