@@ -11,10 +11,14 @@
 
 package alluxio;
 
+import alluxio.conf.PropertyKey;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.status.UnavailableException;
 import alluxio.master.MasterClientContext;
 import alluxio.master.MasterInquireClient;
+import alluxio.retry.ExponentialBackoffRetry;
 import alluxio.retry.RetryPolicy;
+import alluxio.retry.RetryUtils;
 
 import java.net.InetSocketAddress;
 import java.util.function.Supplier;
@@ -34,7 +38,17 @@ public abstract class AbstractMasterClient extends AbstractClient {
    * @param clientConf master client configuration
    */
   public AbstractMasterClient(MasterClientContext clientConf) {
-    super(clientConf, null);
+    super(clientConf, null,
+        clientConf.getClusterConf().getBoolean(TxPropertyKey.USER_FALLBACK_ENABLED)
+            ? () -> new ExponentialBackoffRetry(
+                clientConf.getClusterConf()
+                    .getInt(TxPropertyKey.USER_FALLBACK_RETRY_BASE_SLEEP_MS),
+                clientConf.getClusterConf().getInt(TxPropertyKey.USER_FALLBACK_RETRY_MAX_SLEEP_MS),
+                clientConf.getClusterConf().getInt(TxPropertyKey.USER_FALLBACK_RETRY_MAX_TIMES))
+            : () -> RetryUtils.defaultClientRetry(
+                clientConf.getClusterConf().getDuration(PropertyKey.USER_RPC_RETRY_MAX_DURATION),
+                clientConf.getClusterConf().getDuration(PropertyKey.USER_RPC_RETRY_BASE_SLEEP_MS),
+                clientConf.getClusterConf().getDuration(PropertyKey.USER_RPC_RETRY_MAX_SLEEP_MS)));
     mMasterInquireClient = clientConf.getMasterInquireClient();
   }
 

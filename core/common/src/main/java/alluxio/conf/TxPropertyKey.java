@@ -119,6 +119,16 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
+  public static final PropertyKey USER_SHIMFS_BYPASS_UFS_IMPL_LIST =
+      new Builder(Name.USER_SHIMFS_BYPASS_UFS_IMPL_LIST)
+          .setDescription("A Set of Hadoop FileSystem implementation lists for ufs by-pass. "
+              + "User use ':' separate different FileSystem for target scheme. \n"
+              + String.format("For example:fs.s3n.impl:com.amazon.ws.emr.hadoop.fs.EmrFileSystem,"
+                  + "fs.ofs.impl:com.qcloud.chdfs.fs.CHDFSHadoopFileSystemAdapter",
+              Name.USER_SHIMFS_BYPASS_UFS_IMPL_LIST))
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.CLIENT)
+          .build();
   public static final PropertyKey MASTER_URI_TRANSLATOR_IMPL =
       new Builder(Name.MASTER_URI_TRANSLATOR_IMPL)
           .setDefaultValue("alluxio.master.file.uritranslator.DefaultUriTranslator")
@@ -132,6 +142,44 @@ public final class TxPropertyKey {
           .setDescription("The class of uri translator implementations, comma separated.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
+          .build();
+  //
+  // Shimfs  fallback related properties
+  //
+  public static final PropertyKey USER_FALLBACK_ENABLED =
+      new Builder(Name.USER_FALLBACK_ENABLED)
+          .setDefaultValue(false)
+          .setDescription("Shimfs support fallback enabled.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.CLIENT)
+          .build();
+  public static final PropertyKey USER_LAZY_FALLBACK_TIMEOUT =
+      new Builder(Name.USER_LAZY_FALLBACK_TIMEOUT)
+          .setDefaultValue(60000)
+          .setDescription("Shimfs lazy fallback timeout.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.CLIENT)
+          .build();
+  public static final PropertyKey USER_FALLBACK_RETRY_BASE_SLEEP_MS =
+      new Builder(Name.USER_FALLBACK_RETRY_BASE_SLEEP_MS)
+          .setDefaultValue(50)
+          .setDescription("Shimfs fallback retry base sleep time.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.CLIENT)
+          .build();
+  public static final PropertyKey USER_FALLBACK_RETRY_MAX_SLEEP_MS =
+      new Builder(Name.USER_FALLBACK_RETRY_MAX_SLEEP_MS)
+          .setDefaultValue(100)
+          .setDescription("Shimfs fallback retry MAX sleep times.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.CLIENT)
+          .build();
+  public static final PropertyKey USER_FALLBACK_RETRY_MAX_TIMES =
+      new Builder(Name.USER_FALLBACK_RETRY_MAX_TIMES)
+          .setDefaultValue(2)
+          .setDescription("Shimfs fallback MAX retry times.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.CLIENT)
           .build();
 
   //
@@ -330,12 +378,26 @@ public final class TxPropertyKey {
         "alluxio.master.shimfs.auto.mount.shared";
     public static final String USER_SHIMFS_BYPASS_PREFIX_LIST =
         "alluxio.user.shimfs.bypass.prefix.list";
+    public static final String USER_SHIMFS_BYPASS_UFS_IMPL_LIST =
+        "alluxio.user.shimfs.bypass.ufs.impl.list";
 
     // Shimfs extended properties
     public static final String MASTER_URI_TRANSLATOR_IMPL =
         "alluxio.master.uri.translator.impl";
     public static final String MASTER_COMPOSITE_URI_TRANSLATOR_IMPL =
         "alluxio.master.composite.uri.translator.impl";
+
+    //Shimfs fall-back  properties
+    public static final String USER_FALLBACK_ENABLED =
+        "alluxio.user.shimfs.fallback.enabled";
+    public static final String USER_LAZY_FALLBACK_TIMEOUT =
+        "alluxio.user.lazy.fallback.timeout";
+    public static final String USER_FALLBACK_RETRY_BASE_SLEEP_MS =
+        "alluxio.user.fallback.retry.base.sleep.ms";
+    public static final String USER_FALLBACK_RETRY_MAX_SLEEP_MS =
+        "alluxio.user.fallback.retry.max.sleep.ms";
+    public static final String USER_FALLBACK_RETRY_MAX_TIMES =
+        "alluxio.user.fallback.retry.max.times";
 
     //
     // Security related properties
