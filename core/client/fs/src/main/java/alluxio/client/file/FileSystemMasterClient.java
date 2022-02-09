@@ -39,6 +39,7 @@ import alluxio.wire.SyncPointInfo;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -302,4 +303,21 @@ public interface FileSystemMasterClient extends Client {
    * @return the state lock waiters and holders thread identifiers
    */
   List<String> getStateLockHolders() throws AlluxioStatusException;
+
+  /**
+   * Decommission workers defined by excluded-workers and option.
+   * @param addOnly option to determine add target excluded workers
+   *                but no effect to other workers already excluded.
+   * @param excludedWorkerSet excluded workers set defined by option
+   */
+  void decommissionWorkers(boolean addOnly, final Set<String> excludedWorkerSet)
+      throws AlluxioStatusException;
+
+  /**
+   * Get journal id from master.
+   * @return journalId
+   */
+  default long heartbeat() throws AlluxioStatusException {
+    return -1;
+  }
 }

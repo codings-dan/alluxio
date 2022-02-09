@@ -145,7 +145,7 @@ service BlockMasterClientService {
   rpc GetWorkerReport(GetWorkerReportPOptions) returns (GetWorkerInfoListPResponse);
 
   /**
-   * Returns a list of worker lost storage information
+   * Returns a list of worker lost storage information.
    */
   rpc GetWorkerLostStorage(GetWorkerLostStoragePOptions) returns (GetWorkerLostStoragePResponse);
 }

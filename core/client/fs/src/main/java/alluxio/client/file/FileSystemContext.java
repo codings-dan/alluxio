@@ -25,6 +25,7 @@ import alluxio.client.metrics.MetricsHeartbeatContext;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ReconfigurableRegistry;
+import alluxio.conf.TxPropertyKey;
 import alluxio.conf.path.SpecificPathConfiguration;
 import alluxio.exception.ExceptionMessage;
 import alluxio.exception.status.AlluxioStatusException;
@@ -117,6 +118,8 @@ public class FileSystemContext implements Closeable {
 
   @GuardedBy("this")
   private boolean mMetricsEnabled;
+  @GuardedBy("this")
+  private boolean mCommandHeartbeatEnabled;
 
   //
   // Master related resources.
@@ -270,6 +273,8 @@ public class FileSystemContext implements Closeable {
     mMasterClientContext = MasterClientContext.newBuilder(ctx)
         .setMasterInquireClient(masterInquireClient).build();
     mMetricsEnabled = getClusterConf().getBoolean(PropertyKey.USER_METRICS_COLLECTION_ENABLED);
+    mCommandHeartbeatEnabled = getClusterConf()
+        .getBoolean(TxPropertyKey.USER_COMMAND_HEARTBEAT_ENABLED);
     if (mMetricsEnabled) {
       MetricsSystem.startSinks(getClusterConf().get(PropertyKey.METRICS_CONF_FILE));
       MetricsHeartbeatContext.addHeartbeat(getClientContext(), masterInquireClient);
@@ -335,6 +340,9 @@ public class FileSystemContext implements Closeable {
 
       if (mMetricsEnabled) {
         MetricsHeartbeatContext.removeHeartbeat(getClientContext());
+      }
+      if (mCommandHeartbeatEnabled) {
+        CommandHeartbeatContext.removeHeartbeat(getClientContext());
       }
     } else {
       LOG.warn("Attempted to close FileSystemContext which has already been closed or not "

@@ -29,6 +29,7 @@ import alluxio.conf.PropertyKey;
 import alluxio.conf.Reconfigurable;
 import alluxio.conf.ReconfigurableRegistry;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AccessControlException;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.BlockInfoException;
@@ -112,6 +113,7 @@ import alluxio.master.file.meta.UfsAbsentPathCache;
 import alluxio.master.file.meta.UfsBlockLocationCache;
 import alluxio.master.file.meta.UfsSyncPathCache;
 import alluxio.master.file.meta.options.MountInfo;
+import alluxio.master.file.uritranslator.UriTranslator;
 import alluxio.master.journal.DelegatingJournaled;
 import alluxio.master.journal.JournalContext;
 import alluxio.master.journal.Journaled;
@@ -388,6 +390,9 @@ public final class DefaultFileSystemMaster extends CoreMaster
   /** Thread pool which asynchronously handles the completion of persist jobs. */
   private java.util.concurrent.ThreadPoolExecutor mPersistCheckerPool;
 
+  /** The provider for authorization with external plugins. */
+  private InodeAttributesProvider mAuthProvider = null;
+
   private ActiveSyncManager mSyncManager;
 
   /** Log writer for user access audit log. */
@@ -400,6 +405,9 @@ public final class DefaultFileSystemMaster extends CoreMaster
 
   /** Used to check pending/running backup from RPCs. */
   private CallTracker mStateLockCallTracker;
+
+  /** Uri translator. */
+  private UriTranslator mUriTranslator;
 
   final ThreadPoolExecutor mSyncPrefetchExecutor = new ThreadPoolExecutor(
       ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_UFS_PREFETCH_POOL_SIZE),
@@ -470,7 +478,16 @@ public final class DefaultFileSystemMaster extends CoreMaster
         return Type.STATE_LOCK_TRACKER;
       }
     };
-    mPermissionChecker = new DefaultPermissionChecker(mInodeTree);
+    if (ServerConfiguration.getBoolean(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_ENABLED)) {
+      AbstractInodeAttributesProviderFactory authProviderFactory =
+          new AbstractInodeAttributesProviderFactory();
+      mUfsManager.registerUfsServiceFactory(InodeAttributesProvider.class, authProviderFactory);
+      mAuthProvider = new ExtensionInodeAttributesProvider(mMountTable, authProviderFactory);
+      mPermissionChecker = new ExtendablePermissionChecker(mInodeTree, mAuthProvider);
+      mUfsManager.addUfsServersForRootUfs();
+    } else {
+      mPermissionChecker = new DefaultPermissionChecker(mInodeTree);
+    }
     mJobMasterClientPool = new JobMasterClientPool(JobMasterClientContext
         .newBuilder(ClientContext.create(ServerConfiguration.global())).build());
     mPersistRequests = new ConcurrentHashMap<>();
@@ -501,6 +518,8 @@ public final class DefaultFileSystemMaster extends CoreMaster
 
     resetState();
     Metrics.registerGauges(mUfsManager, mInodeTree);
+
+    mUriTranslator = UriTranslator.Factory.create(this, mMountTable, mInodeTree);
   }
 
   private static MountInfo getRootMountInfo(MasterUfsManager ufsManager) {
@@ -701,6 +720,9 @@ public final class DefaultFileSystemMaster extends CoreMaster
                 (int) ServerConfiguration.getMs(PropertyKey.UNDERFS_CLEANUP_INTERVAL),
                 ServerConfiguration.global(), mMasterContext.getUserState()));
       }
+      if (mAuthProvider != null) {
+        mAuthProvider.start();
+      }
       mAccessTimeUpdater.start();
       mSyncManager.start();
     }
@@ -714,6 +736,10 @@ public final class DefaultFileSystemMaster extends CoreMaster
     }
     mSyncManager.stop();
     mAccessTimeUpdater.stop();
+
+    if (mAuthProvider != null) {
+      mAuthProvider.stop();
+    }
     super.stop();
   }
 
@@ -1725,6 +1751,14 @@ public final class DefaultFileSystemMaster extends CoreMaster
               getDisplayMountPointInfo(mountPoint.getValue(), invokeUfs));
     }
     return mountPoints;
+  }
+
+  @Override
+  public AlluxioURI translateUri(String uriStr) throws InvalidPathException {
+    if (mUriTranslator != null) {
+      return mUriTranslator.translateUri(uriStr);
+    }
+    return new AlluxioURI(uriStr);
   }
 
   @Override
@@ -3533,6 +3567,14 @@ public final class DefaultFileSystemMaster extends CoreMaster
       @Nullable Function<LockedInodePath, Inode> auditContextSrcInodeFunc,
       @Nullable PermissionCheckFunction permissionCheckOperation,
       boolean isGetFileInfo) throws AccessControlException, InvalidPathException {
+    if ((!options.hasSyncIntervalMs() || options.getSyncIntervalMs() < 0)
+        && ServerConfiguration.getMs(PropertyKey.USER_FILE_METADATA_SYNC_INTERVAL) < 0) {
+      if (ServerConfiguration.getList(
+          TxPropertyKey.MASTER_FILE_METADATA_SYNC_LIST, ",").contains(path.getPath())) {
+        options = options.toBuilder().setSyncIntervalMs(ServerConfiguration.getMs(
+            TxPropertyKey.MASTER_FILE_METADATA_SYNC_INTERVAL)).build();
+      }
+    }
     LockingScheme syncScheme = createSyncLockingScheme(path, options, isGetFileInfo);
     InodeSyncStream sync = new InodeSyncStream(syncScheme, this, rpcContext, syncDescendantType,
         options, auditContext, auditContextSrcInodeFunc, permissionCheckOperation, isGetFileInfo,
@@ -4793,5 +4835,19 @@ public final class DefaultFileSystemMaster extends CoreMaster
   @Override
   public List<String> getStateLockSharedWaitersAndHolders() {
     return mMasterContext.getStateLockManager().getSharedWaitersAndHolders();
+  }
+
+  @Override
+  public void decommissionWorkers(final Set<String> excludedWorkerSet, boolean addOnly) {
+    mBlockMaster.decommissionWorkers(excludedWorkerSet, addOnly);
+  }
+
+  @Override
+  public long commandHeartbeat()  {
+    // Get the journal index of the leader node. In most circumstances,
+    // the index of each node is same. If they are inconsistent, the largest
+    // journal Index belongs to the leader node.
+    return mMasterContext.getJournalSystem().getCurrentSequenceNumbers()
+        .values().stream().max(Long::compare).get();
   }
 }

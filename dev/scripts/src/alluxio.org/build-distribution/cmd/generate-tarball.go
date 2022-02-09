@@ -40,6 +40,9 @@ func Single(args []string) error {
 	singleCmd.BoolVar(&skipUIFlag, "skip-ui", false, fmt.Sprintf("set this flag to skip building the webui. This will speed up the build times "+
 		"but the generated tarball will have no Alluxio WebUI although REST services will still be available."))
 	singleCmd.BoolVar(&skipHelmFlag, "skip-helm", true, fmt.Sprintf("set this flag to skip using Helm to generate YAML templates for K8s deployment scenarios"))
+	singleCmd.StringVar(&authModulesFlag, "auth-modules", strings.Join(defaultModules(authModules), ","),
+    fmt.Sprintf("a comma-separated list of authorization modules to compile into the distribution tarball(s). Specify 'all' to build all authorization modules. Supported authorization modules: [%v]", strings.Join(validModules(authModules), ",")))
+
 	singleCmd.Parse(args[2:]) // error handling by flag.ExitOnError
 
 	if customUfsModuleFlag != "" {
@@ -231,6 +234,7 @@ func addAdditionalFiles(srcPath, dstPath string, hadoopVersion version, version 
 
 	mkdir(filepath.Join(dstPath, "lib"))
 	addModules(srcPath, dstPath, "underfs", ufsModulesFlag, version, ufsModules)
+	addModules(srcPath, dstPath, "authorization", authModulesFlag, version, authModules)
 }
 
 func generateTarball(skipUI, skipHelm bool) error {
@@ -283,6 +287,7 @@ func generateTarball(skipUI, skipHelm bool) error {
 
 	// Compile ufs modules for the main build
 	buildModules(srcPath, "underfs", ufsModulesFlag, version, ufsModules, mvnArgs)
+	buildModules(srcPath, "authorization", authModulesFlag, version, authModules, mvnArgs)
 
 	versionString := version
 	if skipUI {

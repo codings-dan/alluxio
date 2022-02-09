@@ -20,6 +20,7 @@ import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.InstancedConfiguration;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.Source;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.DirectoryNotEmptyException;
 import alluxio.exception.FileAlreadyExistsException;
@@ -154,8 +155,15 @@ public interface FileSystem extends Closeable {
           LOG.debug("{}={} ({})", key.getName(), value, source);
         }
       }
+      boolean commandHeartbeatEnabled =
+          context.getClusterConf().getBoolean(TxPropertyKey.USER_COMMAND_HEARTBEAT_ENABLED);
       FileSystem fs = conf.getBoolean(PropertyKey.USER_METADATA_CACHE_ENABLED)
           ? new MetadataCachingBaseFileSystem(context) : new BaseFileSystem(context);
+      if (fs instanceof MetadataCachingBaseFileSystem && commandHeartbeatEnabled) {
+        CommandHeartbeatContext.addHeartbeat(context.getClientContext(),
+            context.getMasterClientContext().getMasterInquireClient(),
+            (MetadataCachingBaseFileSystem) fs);
+      }
       // Enable local cache only for clients which have the property set.
       if (conf.getBoolean(PropertyKey.USER_CLIENT_CACHE_ENABLED)
           && CommonUtils.PROCESS_TYPE.get().equals(CommonUtils.ProcessType.CLIENT)) {

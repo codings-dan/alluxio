@@ -241,6 +241,10 @@ public enum ExceptionMessage {
       "Invalid mode {0} - contains invalid segment {1} which has invalid targets {2}"),
   PERMISSION_DENIED("Permission denied: {0}"),
   SECURITY_IS_NOT_ENABLED("Security is not enabled"),
+  CANNOT_GET_GROUPS_FROM_LDAP_SERVER("Cannot get groups for user {0} from the LDAP server"
+      + " after {1} attempts"),
+  CANNOT_INITIALIZE_DIR_CONTEXT("Cannot initialize DirContext: {0}"),
+  CANNOT_READ_PASSWORD_FILE("Cannot read password file {0}"),
 
   // yarn
   YARN_NOT_ENOUGH_HOSTS(

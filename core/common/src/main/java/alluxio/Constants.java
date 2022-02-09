@@ -56,6 +56,7 @@ public final class Constants {
   public static final String NO_SCHEME = "alluxio-noop";
   public static final String SCHEME = "alluxio";
   public static final String HEADER = SCHEME + "://";
+  public static final String ROOT_PATH = "/";
 
   // Under Filesystem URI Schemes
   public static final String HEADER_ABFS = "abfs://";
@@ -80,6 +81,7 @@ public final class Constants {
   public static final String HEADER_WASB = "wasb://";
   public static final String HEADER_WASBS = "wasbs://";
   public static final String HEADER_OBS = "obs://";
+  public static final String HEADER_OFS = "ofs://";
 
   public static final int MAX_PORT = 65535;
 

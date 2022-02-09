@@ -169,6 +169,10 @@ public interface FileSystemMaster extends Master {
       throws AccessControlException, FileDoesNotExistException, InvalidPathException,
       UnavailableException, IOException;
 
+  default AlluxioURI translateUri(String uriStr) throws InvalidPathException {
+    return new AlluxioURI(uriStr);
+  }
+
   /**
    * @return a read-only view of the file system master
    */
@@ -614,4 +618,18 @@ public interface FileSystemMaster extends Master {
    * @return the list of thread identifiers that are waiting and holding the state lock
    */
   List<String> getStateLockSharedWaitersAndHolders();
+
+  /**
+   * Decommission workers defined by excluded-workers file.
+   * @param excludedWorkerSet excluded workers set defined by option
+   * @param addOnly option to determine add target excluded workers
+   *                but no effect to other workers already excluded.
+   */
+  void decommissionWorkers(final Set<String> excludedWorkerSet, boolean addOnly);
+
+  /**
+   * Get journal id from master.
+   * @return journalId
+   */
+  long commandHeartbeat();
 }

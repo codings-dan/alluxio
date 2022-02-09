@@ -29,8 +29,11 @@ import alluxio.AuthenticatedUserRule;
 import alluxio.ConfigurationRule;
 import alluxio.Constants;
 import alluxio.client.WriteType;
+import alluxio.conf.AlluxioProperties;
+import alluxio.conf.InstancedConfiguration;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AccessControlException;
 import alluxio.exception.BlockInfoException;
 import alluxio.exception.DirectoryNotEmptyException;
@@ -97,6 +100,7 @@ import alluxio.util.IdUtils;
 import alluxio.util.ThreadFactoryUtils;
 import alluxio.util.executor.ExecutorServiceFactories;
 import alluxio.util.io.FileUtils;
+import alluxio.util.io.PathUtils;
 import alluxio.wire.FileBlockInfo;
 import alluxio.wire.FileInfo;
 import alluxio.wire.FileSystemCommand;
@@ -195,6 +199,7 @@ public final class FileSystemMasterTest {
           AlluxioTestDirectory.createTemporaryDirectory("workdir").getAbsolutePath());
       put(PropertyKey.MASTER_MOUNT_TABLE_ROOT_UFS, AlluxioTestDirectory
           .createTemporaryDirectory("FileSystemMasterTest").getAbsolutePath());
+      put(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_ENABLED, "true");
       put(PropertyKey.MASTER_FILE_SYSTEM_OPERATION_RETRY_CACHE_ENABLED, "false");
     }
   }, ServerConfiguration.global());
@@ -216,6 +221,9 @@ public final class FileSystemMasterTest {
     MetricsSystem.clearAllMetrics();
     // This makes sure that the mount point of the UFS corresponding to the Alluxio root ("/")
     // doesn't exist by default (helps loadRootTest).
+//    UnderFileSystemConfiguration conf =new UnderFileSystemConfiguration(new AlluxioProperties());
+//    conf.merge(ImmutableMap.of(DFS_NAMENODE_INODE_ATTRIBUTES_PROVIDER_KEY,
+//            DummyHdfsProvider.class.getName()), Source.RUNTIME);
     mUnderFS = ServerConfiguration.get(PropertyKey.MASTER_MOUNT_TABLE_ROOT_UFS);
     mNestedFileContext = CreateFileContext.mergeFrom(
         CreateFilePOptions.newBuilder().setBlockSizeBytes(Constants.KB)
@@ -2731,6 +2739,49 @@ public final class FileSystemMasterTest {
             Constants.MEDIUM_SSD, (long) Constants.KB),
         ImmutableMap.of(), new HashMap<String, StorageList>(),
         RegisterWorkerPOptions.getDefaultInstance());
+  }
+
+  @Test
+  public void checkMasterFallbackPermissionFail() throws Exception {
+    String noAccessDir = "no_access";
+    String ufsSubdir = PathUtils.concatPath(mUnderFS, noAccessDir);
+    FileUtils.createDir(ufsSubdir);
+    FileUtils.changeLocalFilePermission(ufsSubdir, "---------");
+    // load metadata to Alluxio
+//    List<FileInfo> listing = mFileSystemMaster.listStatus(new AlluxioURI("/test"),
+//            ListStatusContext.mergeFrom(ListStatusPOptions.newBuilder()
+//                    .setLoadMetadataType(LoadMetadataPType.ALWAYS).setRecursive(true)));
+    mFileSystemMaster.listStatus(new AlluxioURI("/" + noAccessDir),
+            ListStatusContext.mergeFrom(ListStatusPOptions.newBuilder()
+                    .setLoadMetadataType(LoadMetadataPType.ALWAYS).setRecursive(true)));
+    mThrown.expect(AccessControlException.class);
+    try (Closeable r = new AuthenticatedUserRule("test_guest",
+        new InstancedConfiguration(new AlluxioProperties())).toResource()) {
+      mFileSystemMaster.listStatus(new AlluxioURI("/" + noAccessDir),
+              ListStatusContext.mergeFrom(ListStatusPOptions.newBuilder()
+                      .setLoadMetadataType(LoadMetadataPType.ALWAYS).setRecursive(true)));
+    }
+  }
+
+  @Test
+  public void checkMasterFallbackParentPermissionFail() throws Exception {
+    String noAccessDir = "no_access";
+    String childDir = "no_access/child";
+    String ufsNoAccessDir = PathUtils.concatPath(mUnderFS, noAccessDir);
+    String ufsChildDir = PathUtils.concatPath(mUnderFS, childDir);
+    FileUtils.createDir(ufsChildDir);
+    FileUtils.changeLocalFilePermission(ufsNoAccessDir, "---------");
+    // load metadata to Alluxio
+    mFileSystemMaster.listStatus(new AlluxioURI("/" + noAccessDir),
+            ListStatusContext.mergeFrom(ListStatusPOptions.newBuilder()
+                    .setLoadMetadataType(LoadMetadataPType.ALWAYS).setRecursive(true)));
+    mThrown.expect(AccessControlException.class);
+    try (Closeable r = new AuthenticatedUserRule("test_guest",
+        new InstancedConfiguration(new AlluxioProperties())).toResource()) {
+      mFileSystemMaster.listStatus(new AlluxioURI("/" + childDir),
+              ListStatusContext.mergeFrom(ListStatusPOptions.newBuilder()
+                      .setLoadMetadataType(LoadMetadataPType.ALWAYS).setRecursive(true)));
+    }
   }
 
   private void stopServices() throws Exception {

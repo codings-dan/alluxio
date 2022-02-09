@@ -21,6 +21,9 @@ import alluxio.grpc.CheckAccessPResponse;
 import alluxio.grpc.CheckConsistencyPOptions;
 import alluxio.grpc.CheckConsistencyPRequest;
 import alluxio.grpc.CheckConsistencyPResponse;
+import alluxio.grpc.CommandHeartbeatPOptions;
+import alluxio.grpc.CommandHeartbeatPRequest;
+import alluxio.grpc.CommandHeartbeatPResponse;
 import alluxio.grpc.CompleteFilePRequest;
 import alluxio.grpc.CompleteFilePResponse;
 import alluxio.grpc.CreateDirectoryPOptions;
@@ -28,6 +31,8 @@ import alluxio.grpc.CreateDirectoryPRequest;
 import alluxio.grpc.CreateDirectoryPResponse;
 import alluxio.grpc.CreateFilePRequest;
 import alluxio.grpc.CreateFilePResponse;
+import alluxio.grpc.DecommissionWorkersPOptions;
+import alluxio.grpc.DecommissionWorkersPResponse;
 import alluxio.grpc.DeletePRequest;
 import alluxio.grpc.DeletePResponse;
 import alluxio.grpc.FileSystemMasterClientServiceGrpc;
@@ -99,6 +104,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -422,6 +428,28 @@ public final class FileSystemMasterClientServiceHandler
     }, "getStateLockHolders", "request=%s", responseObserver, request);
   }
 
+  @Override
+  public void decommissionWorkers(DecommissionWorkersPOptions request,
+      StreamObserver<alluxio.grpc.DecommissionWorkersPResponse> responseObserver) {
+    boolean addOnly = request.getAddOnly();
+    Set<String> excludedWorkerSet = request.getExcludedWorkersList()
+        .stream().collect(Collectors.toSet());
+    RpcUtils.call(LOG, () -> {
+      mFileSystemMaster.decommissionWorkers(excludedWorkerSet, addOnly);
+      return DecommissionWorkersPResponse.newBuilder().build();
+    }, "decommissionWorkers", "request=%s", responseObserver, request);
+  }
+
+  @Override
+  public void commandHeartbeat(CommandHeartbeatPRequest request,
+      StreamObserver<alluxio.grpc.CommandHeartbeatPResponse> responseObserver) {
+    RpcUtils.call(LOG, () -> {
+      long journalId = mFileSystemMaster.commandHeartbeat();
+      return CommandHeartbeatPResponse.newBuilder().setOptions(
+          CommandHeartbeatPOptions.newBuilder().setJournalId(journalId).build()).build();
+    }, "commandHeartbeat", "request=%s", responseObserver, request);
+  }
+
   /**
    * Helper to return {@link AlluxioURI} from transport URI.
    *
@@ -429,6 +457,6 @@ public final class FileSystemMasterClientServiceHandler
    * @return a {@link AlluxioURI} instance
    */
   private AlluxioURI getAlluxioURI(String uriStr) throws InvalidPathException {
-    return new AlluxioURI(uriStr);
+    return mFileSystemMaster.translateUri(uriStr);
   }
 }

@@ -218,6 +218,14 @@ public interface BlockMaster extends Master, ContainerIdGenerable {
   void releaseRegisterLease(long workerId);
 
   /**
+   * Decommission workers defined by excluded-workers.
+   * @param excludedWorkerSet excluded workers set defined by option
+   * @param addOnly option to determine add target excluded workers
+   *                but no effect to other workers already excluded.
+   */
+  void decommissionWorkers(final Set<String> excludedWorkerSet, boolean addOnly);
+
+  /**
    * Updates metadata when a worker registers with the master.
    *
    * @param workerId the worker id of the worker registering

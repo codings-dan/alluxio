@@ -127,4 +127,23 @@ public interface UfsManager extends Closeable {
    * @return the UFS client associated with journal location
    */
   UfsClient getJournal(URI location);
+
+  /**
+   * Registers a factory for creating a specify type of UFS service.
+   *
+   * @param serviceType type of the UFS service to create
+   * @param factory factory to be registered
+   */
+  void registerUfsServiceFactory(Class<? extends UfsService> serviceType,
+      UfsServiceFactory factory);
+
+  /**
+   * Gets UFS service from the manager if this mount ID exists, or throws exception otherwise.
+   *
+   * @param mountId the mount id
+   * @param serviceType type of the UFS service
+   * @param <T> type of the service
+   * @return the UFS service, or null if the service is not provided for the UFS
+   */
+  <T extends UfsService> T getUfsService(long mountId, Class<T> serviceType);
 }
