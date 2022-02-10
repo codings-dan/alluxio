@@ -23,8 +23,10 @@ exports[`Workers Shallow component Matches snapshot 1`] = `
         >
           <thead>
             <tr>
-              <th>
-                Node Name(Container Host)
+              <th
+                id="id-nodename"
+              >
+                Node Name
               </th>
               <th>
                 Last Heartbeat
