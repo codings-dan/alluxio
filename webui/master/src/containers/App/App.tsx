@@ -24,7 +24,18 @@ import {
   SlackButton,
 } from '@alluxio/common-ui/src/components';
 import { triggerRefresh } from '@alluxio/common-ui/src/store/refresh/actions';
-import { Browse, MasterConfiguration, Data, MasterLogs, Metrics, Overview, Workers, Stacks, MountTable } from '..';
+import {
+  Browse,
+  MasterConfiguration,
+  Data,
+  MasterLogs,
+  Metrics,
+  Overview,
+  Workers,
+  Stacks,
+  MountTable,
+  Clients,
+} from '..';
 import { footerNavigationData, headerNavigationData, routePaths } from '../../constants';
 import { IApplicationState } from '../../store';
 import { fetchRequest } from '../../store/init/actions';
@@ -87,6 +98,7 @@ export class App extends React.Component<AllProps> {
               <Route path={routePaths.workers} exact={true} render={this.renderView(Workers)} />
               <Route path={routePaths.stacks} exact={true} render={this.renderView(Stacks)} />
               <Route path={routePaths.mounttable} exact={true} render={this.renderView(MountTable)} />
+              <Route path={routePaths.clients} exact={true} render={this.renderView(Clients)} />
               <Route render={this.redirectToOverview} />
             </Switch>
           </div>

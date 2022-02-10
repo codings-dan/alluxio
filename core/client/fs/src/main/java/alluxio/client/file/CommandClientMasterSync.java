@@ -16,6 +16,7 @@ import alluxio.exception.status.AlluxioStatusException;
 import alluxio.exception.status.UnavailableException;
 import alluxio.master.MasterClientContext;
 import alluxio.master.MasterInquireClient;
+import alluxio.wire.ClientIdentifier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,10 +58,61 @@ public final class CommandClientMasterSync {
   }
 
   /**
-   * Get journal id information from the master.
-   * @return journal id
+   * Transport client information and get journal id information from the master.
+   * @param clientId the client id
+   * @param metadataSize the metadata cache size of client
+   * @return the journal id of master
    */
-  public synchronized long heartbeat() {
+  public synchronized long heartbeat(long clientId, long metadataSize) {
+    Long errorCode = loadConfiguration();
+    if (errorCode != null) {
+      return errorCode;
+    }
+    try {
+      mJournalId = mMasterClient.heartbeat(clientId, metadataSize);
+    } catch (IOException e) {
+      LOG.warn("Failed to get journal id from master: {}", e.toString());
+      return ERROR_CODE;
+    }
+    return mJournalId;
+  }
+
+  public synchronized long getClientId(ClientIdentifier clientIdentifier) {
+    Long errorCode = loadConfiguration();
+    if (errorCode != null) {
+      return errorCode;
+    }
+    long clientId;
+    try {
+      clientId = mMasterClient.getClientId(clientIdentifier);
+    } catch (Exception e) {
+      LOG.warn("Failed to register the client to master: {}", e.toString());
+      return ERROR_CODE;
+    }
+    return clientId;
+  }
+
+  /**
+   * Register the client to the master.
+   * @param startTime the client start time
+   * @param clientId the client id
+   * @return client id
+   */
+  public synchronized long register(long clientId, long startTime) {
+    Long errorCode = loadConfiguration();
+    if (errorCode != null) {
+      return errorCode;
+    }
+    try {
+      mMasterClient.register(clientId, startTime);
+    } catch (Exception e) {
+      LOG.warn("Failed to register the client to master: {}", e.toString());
+      return ERROR_CODE;
+    }
+    return 0;
+  }
+
+  private Long loadConfiguration() {
     if (mMasterClient == null) {
       if (loadConf()) {
         mMasterClient = new RetryHandlingFileSystemMasterClient(MasterClientContext
@@ -69,16 +121,10 @@ public final class CommandClientMasterSync {
             .build());
       } else {
         LOG.error("Failed to load conf and can't heartbeat");
-        return ERROR_CODE; // not heartbeat when failed to load conf
+        return ERROR_CODE;
       }
     }
-    try {
-      mJournalId = mMasterClient.heartbeat();
-    } catch (IOException e) {
-      LOG.warn("Failed to get journal id from master: {}", e.toString());
-      return ERROR_CODE;
-    }
-    return mJournalId;
+    return null;
   }
 
   /**

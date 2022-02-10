@@ -20,3 +20,4 @@ export { default as Workers } from './pages/Workers/Workers';
 export { default as Metrics } from './pages/Metrics/Metrics';
 export { default as Stacks } from './pages/Stacks/Stacks';
 export { default as MountTable } from './pages/MountTable/MountTable';
+export { default as Clients } from './pages/Clients/Clients';

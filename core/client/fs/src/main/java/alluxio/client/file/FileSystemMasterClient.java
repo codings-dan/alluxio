@@ -34,6 +34,7 @@ import alluxio.grpc.SetAttributePOptions;
 import alluxio.grpc.UpdateUfsModePOptions;
 import alluxio.master.MasterClientContext;
 import alluxio.security.authorization.AclEntry;
+import alluxio.wire.ClientIdentifier;
 import alluxio.wire.MountPointInfo;
 import alluxio.wire.SyncPointInfo;
 
@@ -314,10 +315,30 @@ public interface FileSystemMasterClient extends Client {
       throws AlluxioStatusException;
 
   /**
-   * Get journal id from master.
-   * @return journalId
+   * Transports the information of the client and get journal id from master.
+   * @param clientId the client id
+   * @param metadataSize the metadata cache size of client
+   * @return the journal id of master
+   * @throws AlluxioStatusException
    */
-  default long heartbeat() throws AlluxioStatusException {
+  default long heartbeat(long clientId, long metadataSize)
+      throws AlluxioStatusException {
+    return -1;
+  }
+
+  /**
+   * Register client to master.
+   * @param clientId the client id
+   * @param registerTime the client register time
+   * @throws AlluxioStatusException
+   */
+  default void register(long clientId, long registerTime)
+      throws AlluxioStatusException {
+    return;
+  }
+
+  default long getClientId(ClientIdentifier clientIdentifier)
+      throws AlluxioStatusException {
     return -1;
   }
 }

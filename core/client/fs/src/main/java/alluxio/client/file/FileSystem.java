@@ -159,10 +159,9 @@ public interface FileSystem extends Closeable {
           context.getClusterConf().getBoolean(TxPropertyKey.USER_COMMAND_HEARTBEAT_ENABLED);
       FileSystem fs = conf.getBoolean(PropertyKey.USER_METADATA_CACHE_ENABLED)
           ? new MetadataCachingBaseFileSystem(context) : new BaseFileSystem(context);
-      if (fs instanceof MetadataCachingBaseFileSystem && commandHeartbeatEnabled) {
+      if (commandHeartbeatEnabled) {
         CommandHeartbeatContext.addHeartbeat(context.getClientContext(),
-            context.getMasterClientContext().getMasterInquireClient(),
-            (MetadataCachingBaseFileSystem) fs);
+            context.getMasterClientContext().getMasterInquireClient(), fs);
       }
       // Enable local cache only for clients which have the property set.
       if (conf.getBoolean(PropertyKey.USER_CLIENT_CACHE_ENABLED)

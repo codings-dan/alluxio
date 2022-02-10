@@ -69,6 +69,10 @@ exports[`App Shallow component Matches snapshot 1`] = `
               "innerText": "MountTable",
               "url": "/mounttable",
             },
+            Object {
+              "innerText": "Clients",
+              "url": "/clients",
+            },
           ]
         }
         history={
@@ -149,6 +153,11 @@ exports[`App Shallow component Matches snapshot 1`] = `
           render={[Function]}
         />
         <Route
+          exact={true}
+          path="/clients"
+          render={[Function]}
+        />
+        <Route
           render={[Function]}
         />
       </Switch>
@@ -180,6 +189,10 @@ exports[`App Shallow component Matches snapshot 1`] = `
             Object {
               "innerText": "MountTable",
               "url": "/mounttable",
+            },
+            Object {
+              "innerText": "Clients",
+              "url": "/clients",
             },
           ]
         }

@@ -14,13 +14,16 @@ package alluxio.client.file;
 import alluxio.ClientContext;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.TxPropertyKey;
+import alluxio.conf.PropertyKey;
 import alluxio.master.MasterInquireClient;
 import alluxio.util.ThreadFactoryUtils;
+import alluxio.wire.ClientIdentifier;
 
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.management.ManagementFactory;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -35,7 +38,7 @@ import java.util.concurrent.TimeUnit;
  * configuration that points to a given master. As new FileSystemContexts are created, if they
  * utilize the same connection details, then they can simply be added to this context so
  * that their information is included in the command heartbeat. To add them, one should simply
- * call {@link #addHeartbeat(ClientContext, MasterInquireClient, MetadataCachingBaseFileSystem)}
+ * call {@link #addHeartbeat(ClientContext, MasterInquireClient, FileSystem)}
  * with the necessary arguments.
  * For each separate set of connection details, a new instance of this class is created. As
  * FileSystemContexts are closed, they remove themselves from the internal command heartbeat.
@@ -53,6 +56,7 @@ public class CommandHeartbeatContext {
 
   private static final long ERROR_CODE = -1L;
   private static final long INITIAL_CODE = -1L;
+  private static final long INVALID_CODE = -1L;
 
   /** The service which executes command heartbeat RPCs. */
   private static ScheduledExecutorService sExecutorService;
@@ -61,14 +65,18 @@ public class CommandHeartbeatContext {
   private final AlluxioConfiguration mConf;
   private long mFailHeartbeatTime;
   private long mJournalId;
-  private final MetadataCachingBaseFileSystem mFs;
+  private final FileSystem mFs;
+  private final long mStartTime;
+  private final int mPid;
 
   // This can only be a primitive if all accesses are synchronized
   private int mCtxCount;
   private ScheduledFuture<?> mCommandMasterHeartbeatTask;
+  private long mClientId;
+  private boolean mHaveHeartbeatSuccessful;
 
   private CommandHeartbeatContext(ClientContext ctx,
-      MasterInquireClient inquireClient, MetadataCachingBaseFileSystem fs) {
+      MasterInquireClient inquireClient, FileSystem fs) {
     mCtxCount = 0;
     mConnectDetails = inquireClient.getConnectDetails();
     mConf = ctx.getClusterConf();
@@ -76,6 +84,10 @@ public class CommandHeartbeatContext {
     mJournalId = 0;
     mFailHeartbeatTime = INITIAL_CODE;
     mFs = fs;
+    mClientId = 0L;
+    mHaveHeartbeatSuccessful = false;
+    mStartTime = System.currentTimeMillis();
+    mPid = Integer.parseInt(ManagementFactory.getRuntimeMXBean().getName().split("@")[0]);
   }
 
   private synchronized void addContext() {
@@ -90,8 +102,27 @@ public class CommandHeartbeatContext {
   }
 
   private synchronized void heartbeat() {
-    long id = mCommandClientMasterSync.heartbeat();
-    if (id == ERROR_CODE) {
+    if (registerClient() < 0) {
+      return;
+    }
+    long journalId;
+    if (mFs instanceof MetadataCachingBaseFileSystem) {
+      journalId = mCommandClientMasterSync.heartbeat(mClientId,
+          ((MetadataCachingBaseFileSystem) mFs).getMetadataCacheSize());
+      handleClearClientMetadataCache(journalId);
+    } else {
+      journalId = mCommandClientMasterSync.heartbeat(mClientId, INVALID_CODE);
+      if (journalId == ERROR_CODE) {
+        LOG.warn("client {} failed to heartbeat with master", mClientId);
+      }
+    }
+    if (journalId != ERROR_CODE) {
+      mHaveHeartbeatSuccessful = true;
+    }
+  }
+
+  private void handleClearClientMetadataCache(long journalId) {
+    if (journalId == ERROR_CODE) {
       if (mFailHeartbeatTime == INITIAL_CODE) {
         mFailHeartbeatTime = System.currentTimeMillis();
         return;
@@ -100,21 +131,44 @@ public class CommandHeartbeatContext {
       long expirationTimeMs = mConf.getMs(TxPropertyKey.USER_COMMAND_HEARTBEAT_INTERVAL_MS);
       if (time >= expirationTimeMs) {
         LOG.info("Failed heartbeat in the past {} s , clear all metadata cache", time / 1000.0);
-        mFs.dropMetadataCacheAll();
+        if (mFs instanceof MetadataCachingBaseFileSystem) {
+          ((MetadataCachingBaseFileSystem) mFs).dropMetadataCacheAll();
+        }
       }
       return;
     }
     mFailHeartbeatTime = INITIAL_CODE;
-    if (id != mJournalId) {
-      mJournalId = id;
+    if (journalId != mJournalId) {
+      mJournalId = journalId;
       // TODO(dragonyliu): clear metadata cache according to journal
-      LOG.info("Journal id change, clear all metadata cache");
-      mFs.dropMetadataCacheAll();
+      LOG.info("Journal journalId change, clear all metadata cache");
+      ((MetadataCachingBaseFileSystem) mFs).dropMetadataCacheAll();
     } else {
-      LOG.debug("The journal id has not changed, refresh the metadata cache,"
+      LOG.debug("The journal journalId has not changed, refresh the metadata cache,"
           + " and extend the expiration time.");
-      mFs.updateMetadataCacheAll();
+      ((MetadataCachingBaseFileSystem) mFs).updateMetadataCacheAll();
     }
+  }
+
+  private long registerClient() {
+    boolean needRegister = mHaveHeartbeatSuccessful && mClientId == 0;
+    if (needRegister) {
+      String host = mConf.getOrDefault(PropertyKey.USER_HOSTNAME, "");
+      String containerHost =
+          mConf.getOrDefault(TxPropertyKey.USER_CONTAINER_HOSTNAME, "");
+      ClientIdentifier clientIdentifier = new ClientIdentifier(host, containerHost, mPid);
+      mClientId = mCommandClientMasterSync.getClientId(clientIdentifier);
+      long code =
+          mCommandClientMasterSync.register(mClientId, mStartTime);
+      if (code == ERROR_CODE) {
+        LOG.info("Failed register client to master.");
+        return ERROR_CODE;
+      } else {
+        LOG.info("Register successful, and the clientId is {}", mClientId);
+        return mClientId;
+      }
+    }
+    return 0;
   }
 
   /**
@@ -142,7 +196,7 @@ public class CommandHeartbeatContext {
    * @param fs the metadata filesystem object
    */
   public static synchronized void addHeartbeat(ClientContext ctx,
-      MasterInquireClient inquireClient, MetadataCachingBaseFileSystem fs) {
+      MasterInquireClient inquireClient, FileSystem fs) {
     Preconditions.checkNotNull(ctx);
     Preconditions.checkNotNull(inquireClient);
 

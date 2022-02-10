@@ -153,6 +153,9 @@ public enum ExceptionMessage {
   // block master
   NO_WORKER_FOUND("No worker with workerId {0,number,#} is found"),
 
+  // block master
+  NO_CLIENT_FOUND("No client with clientId {0,number,#} is found"),
+
   // table master
   DATABASE_DOES_NOT_EXIST("Database {0} does not exist"),
   TABLE_DOES_NOT_EXIST("Table {0} does not exist in database {1}"),

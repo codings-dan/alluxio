@@ -1016,6 +1016,11 @@ public final class MetricKey implements Comparable<MetricKey> {
           .setDescription("Total number of lost workers inside the cluster")
           .setMetricType(MetricType.GAUGE)
           .build();
+  public static final MetricKey CLUSTER_REGISTER_CLIENTS =
+      new Builder("Cluster.RegisterClients")
+          .setDescription("Total number of client register in master inside the cluster")
+          .setMetricType(MetricType.GAUGE)
+          .build();
 
   // Server metrics shared by Master, Worker and other Alluxio servers
   public static final MetricKey TOTAL_EXTRA_TIME =

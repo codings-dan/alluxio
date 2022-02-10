@@ -50,6 +50,23 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
+  public static final PropertyKey MASTER_LOST_CLIENT_DETECTION_INTERVAL =
+      new Builder(Name.MASTER_LOST_CLIENT_DETECTION_INTERVAL)
+          .setDefaultValue("20sec")
+          .setAlias("alluxio.master.worker.heartbeat.interval")
+          .setDescription("The interval between Alluxio master detections to find lost clients "
+              + "based on updates from Alluxio workers.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.SERVER)
+          .build();
+  public static final PropertyKey MASTER_CLIENT_TIMEOUT_MS =
+      new Builder(Name.MASTER_CLIENT_TIMEOUT_MS)
+          .setAlias("alluxio.master.client.timeout.ms")
+          .setDefaultValue("5min")
+          .setDescription("Timeout between master and client indicating a lost client.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.MASTER)
+          .build();
 
   //
   // Shimfs  related properties
@@ -249,6 +266,12 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
+  public static final PropertyKey USER_CONTAINER_HOSTNAME =
+      new Builder(Name.USER_CONTAINER_HOSTNAME)
+          .setDescription("The container hostname if client is running in a container.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.IGNORE)
+          .setScope(Scope.WORKER)
+          .build();
 
   /**
    * A nested class to hold named string constants for their corresponding properties.
@@ -263,6 +286,9 @@ public final class TxPropertyKey {
         "alluxio.master.file.metadata.sync.interval";
     public static final String MASTER_FILE_METADATA_SYNC_LIST =
         "alluxio.master.file.metadata.sync.list";
+    public static final String MASTER_LOST_CLIENT_DETECTION_INTERVAL =
+        "alluxio.master.lost.client.detection.interval";
+    public static final String MASTER_CLIENT_TIMEOUT_MS = "alluxio.master.client.timeout";
 
     //
     // Worker related properties
@@ -277,6 +303,8 @@ public final class TxPropertyKey {
         "alluxio.user.command.heartbeat.enabled";
     public static final String USER_COMMAND_HEARTBEAT_INTERVAL_MS =
         "alluxio.user.command.heartbeat.interval.ms";
+    public static final String USER_CONTAINER_HOSTNAME =
+        "alluxio.user.container.hostname";
 
     //
     // Shimfs related properties

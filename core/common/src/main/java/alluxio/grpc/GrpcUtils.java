@@ -35,6 +35,7 @@ import alluxio.wire.TieredIdentity;
 import alluxio.wire.UfsInfo;
 import alluxio.wire.WorkerInfo;
 import alluxio.wire.WorkerNetAddress;
+import alluxio.wire.ClientIdentifier;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HostAndPort;
@@ -345,6 +346,14 @@ public final class GrpcUtils {
     return workerNetAddress;
   }
 
+  public static ClientIdentifier fromProto(alluxio.grpc.ClientIdentifier clientIdentifier) {
+    ClientIdentifier identifier = new ClientIdentifier();
+    identifier.setHost(clientIdentifier.getHost());
+    identifier.setContainerHost(clientIdentifier.getContainerHost());
+    identifier.setPid(clientIdentifier.getPid());
+    return identifier;
+  }
+
   /**
    * @param acl the access control list to convert
    * @return the proto representation of this object
@@ -623,6 +632,14 @@ public final class GrpcUtils {
       address.setTieredIdentity(toProto(workerNetAddress.getTieredIdentity()));
     }
     return address.build();
+  }
+
+  public static alluxio.grpc.ClientIdentifier toProto(ClientIdentifier clientIdentifier) {
+    alluxio.grpc.ClientIdentifier.Builder identifier = alluxio.grpc.ClientIdentifier.newBuilder()
+        .setHost(clientIdentifier.getHost())
+        .setContainerHost(clientIdentifier.getContainerHost())
+        .setPid(clientIdentifier.getPid());
+    return identifier.build();
   }
 
   /**

@@ -501,10 +501,29 @@ message DecommissionWorkersPOptions {
   repeated string excludedWorkers = 2;
 }
 
+message GetClientIdPRequest {
+  optional grpc.ClientIdentifier ClientIdentifier = 1;
+  optional int32 pid = 2;
+}
+message GetClientIdPResponse {
+  optional int64 clientId = 1;
+}
+
+message ClientRegisterPResponse {
+}
+message ClientRegisterPRequest {
+  optional int64 clientId = 1;
+  optional int64 startTime = 2;
+}
+
 message CommandHeartbeatPResponse {
   required CommandHeartbeatPOptions options = 1;
 }
-message CommandHeartbeatPRequest {}
+message CommandHeartbeatPRequest {
+  optional int64 clientId = 1;
+  optional int64 metadataCacheSize = 2;
+}
+
 message CommandHeartbeatPOptions {
   required int64 journalId = 1;
 }
@@ -647,6 +666,10 @@ service FileSystemMasterClientService {
   rpc DecommissionWorkers(DecommissionWorkersPOptions) returns (DecommissionWorkersPResponse);
 
   rpc CommandHeartbeat(CommandHeartbeatPRequest) returns (CommandHeartbeatPResponse);
+
+  rpc ClientRegister(ClientRegisterPRequest) returns (ClientRegisterPResponse);
+
+  rpc GetClientId(GetClientIdPRequest) returns (GetClientIdPResponse);
 }
 
 message FileSystemHeartbeatPResponse {

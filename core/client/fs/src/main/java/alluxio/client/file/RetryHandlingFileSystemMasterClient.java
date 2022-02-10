@@ -19,6 +19,7 @@ import alluxio.grpc.CheckAccessPOptions;
 import alluxio.grpc.CheckAccessPRequest;
 import alluxio.grpc.CheckConsistencyPOptions;
 import alluxio.grpc.CheckConsistencyPRequest;
+import alluxio.grpc.ClientRegisterPRequest;
 import alluxio.grpc.CommandHeartbeatPRequest;
 import alluxio.grpc.CompleteFilePOptions;
 import alluxio.grpc.CompleteFilePRequest;
@@ -32,6 +33,7 @@ import alluxio.grpc.DeletePRequest;
 import alluxio.grpc.FileSystemMasterClientServiceGrpc;
 import alluxio.grpc.FreePOptions;
 import alluxio.grpc.FreePRequest;
+import alluxio.grpc.GetClientIdPRequest;
 import alluxio.grpc.GetFilePathPRequest;
 import alluxio.grpc.GetMountTablePRequest;
 import alluxio.grpc.GetNewBlockIdForFilePOptions;
@@ -68,6 +70,7 @@ import alluxio.master.MasterClientContext;
 import alluxio.retry.RetryUtils;
 import alluxio.security.authorization.AclEntry;
 import alluxio.util.FileSystemOptions;
+import alluxio.wire.ClientIdentifier;
 import alluxio.wire.SyncPointInfo;
 
 import org.slf4j.Logger;
@@ -398,10 +401,29 @@ public final class RetryHandlingFileSystemMasterClient extends AbstractMasterCli
   }
 
   @Override
-  public long heartbeat() throws AlluxioStatusException {
+  public long heartbeat(long clientId, long metadataSize)
+      throws AlluxioStatusException {
     return retryRPC(() ->
-        mClient.commandHeartbeat(CommandHeartbeatPRequest.newBuilder().build())
-            .getOptions().getJournalId(), RPC_LOG, "CommandHeartbeat", "");
+        mClient.commandHeartbeat(CommandHeartbeatPRequest.newBuilder().setClientId(clientId)
+            .setMetadataCacheSize(metadataSize).build()).getOptions().getJournalId(), RPC_LOG,
+        "CommandHeartbeat", "");
+  }
+
+  @Override
+  public void register(long clientId, long startTime)
+      throws AlluxioStatusException {
+    retryRPC(() ->
+        mClient.clientRegister(ClientRegisterPRequest.newBuilder().setClientId(clientId)
+            .setStartTime(startTime).build()), RPC_LOG, "ClientRegister", "");
+  }
+
+  @Override
+  public long getClientId(ClientIdentifier clientIdentifier)
+      throws AlluxioStatusException {
+    return retryRPC(() ->
+        mClient.getClientId(GetClientIdPRequest.newBuilder()
+                .setClientIdentifier(GrpcUtils.toProto(clientIdentifier)).build())
+            .getClientId(), RPC_LOG, "GetClientId", "");
   }
 
   /**

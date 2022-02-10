@@ -11,6 +11,7 @@
 
 package alluxio.util.webui;
 
+import alluxio.wire.ClientInfo;
 import alluxio.wire.WorkerInfo;
 
 import java.util.Arrays;
@@ -49,6 +50,23 @@ public final class WebUtils {
     int index = 0;
     for (WorkerInfo workerInfo : workerInfos) {
       ret[index++] = new NodeInfo(workerInfo);
+    }
+    Arrays.sort(ret);
+
+    return ret;
+  }
+
+  /**
+   * Order the nodes by hostName and generate {@link ClientNodeInfo} list for UI display.
+   *
+   * @param clientInfos the list of {@link ClientInfo} objects
+   * @return the list of {@link ClientNodeInfo} objects
+   */
+  public static ClientNodeInfo[] generateOrderedClientInfos(Collection<ClientInfo> clientInfos) {
+    ClientNodeInfo[] ret = new ClientNodeInfo[clientInfos.size()];
+    int index = 0;
+    for (ClientInfo clientInfo: clientInfos) {
+      ret[index++] = new ClientNodeInfo(clientInfo);
     }
     Arrays.sort(ret);
 

@@ -9,12 +9,11 @@
  * See the NOTICE file distributed with this work for information regarding copyright ownership.
  */
 
-export * from './data/headerNavigation';
-export * from './data/footerNavigation';
-export * from './data/routePaths';
-
-export * from './types/INodeInfo';
-export * from './types/IScopedPropertyInfo';
-export * from './types/IStorageTierInfo';
-export * from '@alluxio/common-ui/src/constants/types/IConfigTriple';
-export * from './types/IClientNodeInfo';
+export interface IClientNodeInfo {
+  host: string;
+  clientId: number;
+  lastHeartbeat: string;
+  registerTime: string;
+  metadataCacheSize: string;
+  pid: string;
+}
