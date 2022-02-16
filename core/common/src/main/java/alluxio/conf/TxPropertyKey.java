@@ -67,6 +67,15 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
+  public static final PropertyKey MASTER_COUNT_TO_REMOVE_BLOCKS_ENABLE =
+      new Builder(Name.MASTER_COUNT_TO_REMOVE_BLOCKS_ENABLE)
+          .setAlias("alluxio.master.count.to.remove.blocks.enable")
+          .setDefaultValue(false)
+          .setDescription("Whether enable master collect the value of blocks to remove,"
+              + "which is use in the metric MASTER_TO_REMOVE_BLOCK_COUNT.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.MASTER)
+          .build();
 
   //
   // Shimfs  related properties
@@ -289,6 +298,8 @@ public final class TxPropertyKey {
     public static final String MASTER_LOST_CLIENT_DETECTION_INTERVAL =
         "alluxio.master.lost.client.detection.interval";
     public static final String MASTER_CLIENT_TIMEOUT_MS = "alluxio.master.client.timeout";
+    public static final String MASTER_COUNT_TO_REMOVE_BLOCKS_ENABLE =
+        "alluxio.master.count.to.remove.blocks.enable";
 
     //
     // Worker related properties
