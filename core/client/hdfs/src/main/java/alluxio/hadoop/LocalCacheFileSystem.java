@@ -92,6 +92,7 @@ public class LocalCacheFileSystem extends org.apache.hadoop.fs.FileSystem {
     MetricsSystem.startSinksFromConfig(new MetricsConfig(metricsProperties));
     mCacheManager = CacheManager.Factory.get(mAlluxioConf);
     mCacheFilter = CacheFilter.create(mAlluxioConf);
+    LocalCacheFileInStream.registerMetrics();
   }
 
   @Override
