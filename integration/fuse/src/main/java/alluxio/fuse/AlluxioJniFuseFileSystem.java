@@ -23,6 +23,7 @@ import alluxio.collections.IndexDefinition;
 import alluxio.collections.IndexedSet;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.PropertyKey;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AccessControlException;
 import alluxio.exception.FileDoesNotExistException;
 import alluxio.fuse.auth.AuthPolicy;
@@ -120,6 +121,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem
       = new IndexedSet<>(ID_INDEX, PATH_INDEX);
   private final boolean mIsUserGroupTranslation;
   private final AuthPolicy mAuthPolicy;
+  private final Set<String> mWorkAroundSet;
 
   // Map for holding the async releasing entries for proper umount
   private final Map<Long, FileInStream> mReleasingReadEntries = new ConcurrentHashMap<>();
@@ -191,6 +193,8 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem
         LOG.error("Failed to set AlluxioJniFuseFileSystem log to debug level", e);
       }
     }
+    mWorkAroundSet = new HashSet<>();
+    mWorkAroundSet.addAll(mConf.getList(TxPropertyKey.FUSE_WORKAROUND_LIST, ","));
     MetricsSystem.registerGaugeIfAbsent(
         MetricsSystem.getMetricName(MetricKey.FUSE_READING_FILE_COUNT.getName()),
         mOpenFileEntries::size);
@@ -385,13 +389,20 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem
       return -ErrorCodes.EIO();
     }
 
-    if (status != null && !status.isCompleted()) {
+    if (!mWorkAroundSet.contains("open") && status != null && !status.isCompleted()) {
       // Cannot open incomplete file for read or write
       // wait for file to complete in read or read_write mode
       if (!AlluxioFuseUtils.waitForFileCompleted(mFileSystem, uri)) {
         LOG.error(String.format("Cannot open incomplete file %s. "
             + "Failed to wait for file completed with flag 0x%x",
             path, flags));
+        return -ErrorCodes.EIO();
+      }
+      // Get status again.
+      try {
+        status = mFileSystem.getStatus(uri);
+      }  catch (Throwable t) {
+        LOG.error("Failed to get status of path {} when opening it.", path);
         return -ErrorCodes.EIO();
       }
     }
@@ -407,7 +418,8 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem
     long fd = mNextOpenFileId.getAndIncrement();
     fi.fh.set(fd);
     try {
-      if (status != null && truncate) {
+      if (status != null && (truncate || (status.getLength() == 0
+          && openAction == OpenAction.WRITE_ONLY))) {
         // Attention: according to POSIX standard
         // file cannot be removed with O_WRONLY or O_RDWR flag itself
         // O_TRUNC or fuse.truncate(size=0) is needed.
@@ -528,6 +540,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem
         // open (O_WRONLY or O_RDWR) needs O_TRUNC open flag
         // or fuse.truncate(size = 0) to delete existing file
         // otherwise cannot overwrite existing file
+        // but open(O_WRONLY) is ok when file length == 0 and completed.
         LOG.error(String.format("Cannot overwrite existing file %s "
             + "without O_TRUNC flag or fuse.truncate(size=0), flag 0x%x",
             path, fi.flags.get()));
@@ -554,7 +567,8 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem
 
     FileOutStream os = ce.getOut();
     long bytesWritten = os.getBytesWritten();
-    if (offset != bytesWritten && offset + sz > bytesWritten) {
+    if (!mWorkAroundSet.contains("write")
+        && offset != bytesWritten && offset + sz > bytesWritten) {
       LOG.error("Only sequential write is supported. Cannot write bytes of size {} to offset {} "
           + "when {} bytes have written to path {}", size, offset, bytesWritten, path);
       return -ErrorCodes.EIO();
@@ -757,6 +771,9 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem
   }
 
   private int chmodInternal(String path, long mode) {
+    if (mWorkAroundSet.contains("chmod")) {
+      return 0;
+    }
     AlluxioURI uri = mPathResolverCache.getUnchecked(path);
 
     SetAttributePOptions options = SetAttributePOptions.newBuilder()
@@ -777,6 +794,9 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem
   }
 
   private int chownInternal(String path, long uid, long gid) {
+    if (mWorkAroundSet.contains("chown")) {
+      return 0;
+    }
     if (!mIsUserGroupTranslation) {
       LOG.info("Cannot change the owner/group of path {}. Please set {} to be true to enable "
               + "user group translation in Alluxio-FUSE.",
@@ -850,6 +870,9 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem
   }
 
   private int truncateInternal(String path, long size) {
+    if (mWorkAroundSet.contains("truncate")) {
+      return 0;
+    }
     // Truncate scenarios:
     // 1. Truncate size = 0, file does not exist => no-op
     // 2. Truncate size = 0, file exists and completed

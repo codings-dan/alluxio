@@ -330,6 +330,16 @@ public final class TxPropertyKey {
           .setScope(Scope.WORKER)
           .build();
 
+  //
+  // Fuse related properties
+  //
+  public static final PropertyKey FUSE_WORKAROUND_LIST =
+      new Builder(Name.FUSE_WORKAROUND_LIST)
+          .setDefaultValue("")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.CLIENT)
+          .build();
+
   /**
    * A nested class to hold named string constants for their corresponding properties.
    * Used for setting configuration in integration tests.
@@ -364,6 +374,12 @@ public final class TxPropertyKey {
         "alluxio.user.command.heartbeat.interval.ms";
     public static final String USER_CONTAINER_HOSTNAME =
         "alluxio.user.container.hostname";
+
+    //
+    // Fuse related properties
+    //
+    public static final String FUSE_WORKAROUND_LIST =
+        "alluxio.fuse.workaround.list";
 
     //
     // Shimfs related properties
