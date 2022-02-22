@@ -17,6 +17,7 @@ import alluxio.conf.TxPropertyKey;
 import alluxio.conf.PropertyKey;
 import alluxio.master.MasterInquireClient;
 import alluxio.util.ThreadFactoryUtils;
+import alluxio.util.network.NetworkAddressUtils;
 import alluxio.wire.ClientIdentifier;
 
 import com.google.common.base.Preconditions;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.management.ManagementFactory;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -153,7 +155,7 @@ public class CommandHeartbeatContext {
   private long registerClient() {
     boolean needRegister = mHaveHeartbeatSuccessful && mClientId == 0;
     if (needRegister) {
-      String host = mConf.getOrDefault(PropertyKey.USER_HOSTNAME, "");
+      String host = getHost(mConf);
       String containerHost =
           mConf.getOrDefault(TxPropertyKey.USER_CONTAINER_HOSTNAME, "");
       ClientIdentifier clientIdentifier = new ClientIdentifier(host, containerHost, mPid);
@@ -169,6 +171,16 @@ public class CommandHeartbeatContext {
       }
     }
     return 0;
+  }
+
+  private String getHost(AlluxioConfiguration conf) {
+    String host = mConf.getOrDefault(PropertyKey.USER_HOSTNAME, "");
+    if (!Objects.equals(host, "")) {
+      return host;
+    } else {
+      return NetworkAddressUtils.getLocalHostName(
+          (int) conf.getMs(PropertyKey.NETWORK_HOST_RESOLUTION_TIMEOUT_MS));
+    }
   }
 
   /**
