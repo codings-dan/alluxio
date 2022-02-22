@@ -34,12 +34,14 @@ import com.sun.management.OperatingSystemMXBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -108,6 +110,14 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     CREDENTIALS,
   }
 
+  public static final Function<Object, Boolean> CHECK_FILE_EXISTS = (fileName) -> {
+    if (!(fileName instanceof String)) {
+      return false;
+    }
+    File file = new File((String) fileName);
+    return file.exists();
+  };
+
   /**
    * Builder to create {@link PropertyKey} instances. Note that, <code>Builder.build()</code> will
    * throw exception if there is an existing property built with the same name.
@@ -125,6 +135,7 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     private Scope mScope = Scope.ALL;
     private DisplayType mDisplayType = DisplayType.DEFAULT;
     private boolean mIsDynamic = true;
+    private Function<Object, Boolean> mValueValidationFunction;
 
     /**
      * @param name name of the property
@@ -260,6 +271,15 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     }
 
     /**
+     * @param valueValidationFunction custom function to validate the property value
+     * @return the updated builder instance
+     */
+    public Builder setValueValidationFunction(Function<Object, Boolean> valueValidationFunction) {
+      mValueValidationFunction = valueValidationFunction;
+      return this;
+    }
+
+    /**
      * Creates and registers the property key.
      *
      * @return the created property key instance
@@ -285,9 +305,14 @@ public final class PropertyKey implements Comparable<PropertyKey> {
             : new DefaultSupplier(() -> defaultString, defaultString);
       }
 
+      if (mValueValidationFunction != null && defaultSupplier.get() != null) {
+        Preconditions.checkState(mValueValidationFunction.apply(defaultSupplier.get()),
+            "Invalid value for property key %s: %s", mName, defaultSupplier.get());
+      }
+
       PropertyKey key = new PropertyKey(mName, mDescription, defaultSupplier, mAlias,
           mIgnoredSiteProperty, mIsHidden, mConsistencyCheckLevel, mScope, mDisplayType,
-          mIsBuiltIn, mIsDynamic);
+          mIsBuiltIn, mIsDynamic, mValueValidationFunction);
       return key;
     }
 
@@ -304,8 +329,11 @@ public final class PropertyKey implements Comparable<PropertyKey> {
   public static final PropertyKey CONF_DIR =
       new Builder(Name.CONF_DIR)
           .setDefaultValue(String.format("${%s}/conf", Name.HOME))
-          .setDescription("The directory containing files used to configure Alluxio.")
+          .setDescription("The directory of Alluxio configuration files."
+              + " This property is only for internal use."
+              + " To change the location, set environment variable $ALLUXIO_CONF_DIR instead.")
           .setIgnoredSiteProperty(true)
+          .setIsHidden(true)
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.ALL)
           .build();
@@ -376,12 +404,15 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.IGNORE)
           .setScope(Scope.ALL)
           .build();
+  // Used in alluxio-config.sh and conf/log4j.properties
   public static final PropertyKey LOGS_DIR =
       new Builder(Name.LOGS_DIR)
           .setDefaultValue(String.format("${%s}/logs", Name.WORK_DIR))
-          .setDescription("The path under Alluxio home directory to store log files. It has a "
-              + "corresponding environment variable $ALLUXIO_LOGS_DIR.")
+          .setDescription("The path to store logs files of Alluxio servers."
+              + " This property is only for internal use."
+              + " To change the location, set environment variable $ALLUXIO_LOGS_DIR instead.")
           .setIgnoredSiteProperty(true)
+          .setIsHidden(true)
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.ALL)
           .build();
@@ -389,9 +420,11 @@ public final class PropertyKey implements Comparable<PropertyKey> {
   public static final PropertyKey USER_LOGS_DIR =
       new Builder(Name.USER_LOGS_DIR)
           .setDefaultValue(String.format("${%s}/user", Name.LOGS_DIR))
-          .setDescription("The path to store logs of Alluxio shell. To change its value, one can "
-              + " set environment variable $ALLUXIO_USER_LOGS_DIR.")
+          .setDescription("The path to store logs of Alluxio command lines."
+              + " This property is only for internal use."
+              + " To change the location, set environment variable $ALLUXIO_USER_LOGS_DIR instead.")
           .setIgnoredSiteProperty(true)
+          .setIsHidden(true)
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .build();
   public static final PropertyKey METRICS_CONF_FILE =
@@ -548,6 +581,14 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setDefaultValue("15s")
           .setDescription("The amount of time to await before refreshing the Web UI if it is set "
               + "to auto refresh.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.SERVER)
+          .build();
+  public static final PropertyKey WEB_THREAD_DUMP_TO_LOG =
+      new Builder(Name.WEB_THREAD_DUMP_TO_LOG)
+          .setDefaultValue(false)
+          .setDescription("Whether thread information is also printed to the log "
+              + "when the thread dump api is accessed")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.SERVER)
           .build();
@@ -2353,6 +2394,7 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setDescription("Kerberos keytab file for Alluxio master.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
+          .setValueValidationFunction(CHECK_FILE_EXISTS)
           .build();
   public static final PropertyKey MASTER_LOG_CONFIG_REPORT_HEARTBEAT_INTERVAL =
       new Builder(Name.MASTER_LOG_CONFIG_REPORT_HEARTBEAT_INTERVAL)
@@ -2895,6 +2937,19 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setScope(Scope.MASTER)
           .build();
 
+  public static final PropertyKey STANDBY_MASTER_METRICS_SINK_ENABLED =
+      new Builder(Name.STANDBY_MASTER_METRICS_SINK_ENABLED)
+          .setDefaultValue(false)
+          .setDescription("Whether a standby master runs the metric sink")
+          .setScope(Scope.SERVER)
+          .build();
+  public static final PropertyKey STANDBY_MASTER_WEB_ENABLED =
+      new Builder(Name.STANDBY_MASTER_WEB_ENABLED)
+          .setDefaultValue(false)
+          .setDescription("Whether a standby master runs a web server")
+          .setScope(Scope.SERVER)
+          .build();
+
   //
   // Secondary master related properties
   //
@@ -3108,6 +3163,13 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.WORKER)
           .build();
+  public static final PropertyKey WORKER_STARTUP_TIMEOUT =
+      new Builder(Name.WORKER_STARTUP_TIMEOUT)
+          .setDefaultValue("10min")
+          .setDescription("Maximum time to wait for worker startup.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.ALL)
+          .build();
   public static final PropertyKey WORKER_MANAGEMENT_BACKOFF_STRATEGY =
       new Builder(Name.WORKER_MANAGEMENT_BACKOFF_STRATEGY)
           .setDefaultValue("ANY")
@@ -3227,6 +3289,7 @@ public final class PropertyKey implements Comparable<PropertyKey> {
       .setDescription("Kerberos keytab file for Alluxio worker.")
       .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
       .setScope(Scope.WORKER)
+      .setValueValidationFunction(CHECK_FILE_EXISTS)
       .build();
   public static final PropertyKey WORKER_MASTER_CONNECT_RETRY_TIMEOUT =
       new Builder(Name.WORKER_MASTER_CONNECT_RETRY_TIMEOUT)
@@ -5945,8 +6008,9 @@ public final class PropertyKey implements Comparable<PropertyKey> {
   public static final PropertyKey HUB_CLUSTER_ID =
           new Builder(Name.HUB_CLUSTER_ID)
                   .setDescription("A user-defined id for the Hub cluster. Must be unique from "
-                          + "other Hub clusters connecting to the same Hosted Hub tenant. Must be "
-                          + "a 4-character alphanumeric string.")
+                          + "other Hub clusters connecting to the same Hosted Hub tenant. must be"
+                          + " a 4-character string containing only lowercase letters (a-z)"
+                          + "and digits (0-9).")
                   .build();
   public static final PropertyKey HUB_CLUSTER_LABEL =
           new Builder(Name.HUB_CLUSTER_LABEL)
@@ -6116,6 +6180,7 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     public static final String WEB_THREADS = "alluxio.web.threads";
     public static final String WEB_CORS_ENABLED = "alluxio.web.cors.enabled";
     public static final String WEB_REFRESH_INTERVAL = "alluxio.web.refresh.interval";
+    public static final String WEB_THREAD_DUMP_TO_LOG = "alluxio.web.threaddump.log.enabled";
     public static final String WEB_UI_ENABLED = "alluxio.web.ui.enabled";
     public static final String WORK_DIR = "alluxio.work.dir";
     public static final String ZOOKEEPER_ADDRESS = "alluxio.zookeeper.address";
@@ -6621,6 +6686,10 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     //
     public static final String SECONDARY_MASTER_METASTORE_DIR =
         "alluxio.secondary.master.metastore.dir";
+    public static final String STANDBY_MASTER_METRICS_SINK_ENABLED =
+        "alluxio.standby.master.metrics.sink.enabled";
+    public static final String STANDBY_MASTER_WEB_ENABLED =
+        "alluxio.standby.master.web.enabled";
 
     //
     // Worker related properties
@@ -6775,6 +6844,7 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     public static final String WORKER_RPC_EXECUTOR_FJP_ASYNC =
         "alluxio.worker.rpc.executor.fjp.async";
     public static final String WORKER_SESSION_TIMEOUT_MS = "alluxio.worker.session.timeout";
+    public static final String WORKER_STARTUP_TIMEOUT = "alluxio.worker.startup.timeout";
     public static final String WORKER_STORAGE_CHECKER_ENABLED =
         "alluxio.worker.storage.checker.enabled";
     public static final String WORKER_TIERED_STORE_BLOCK_LOCK_READERS =
@@ -7649,6 +7719,9 @@ public final class PropertyKey implements Comparable<PropertyKey> {
   /** Whether the property could be updated dynamically. */
   private final boolean mDynamic;
 
+  /** A custom function to validate the value. */
+  private final Function<Object, Boolean> mValueValidationFunction;
+
   /**
    * @param name String of this property
    * @param description String description of this property key
@@ -7665,7 +7738,7 @@ public final class PropertyKey implements Comparable<PropertyKey> {
   private PropertyKey(String name, String description, DefaultSupplier defaultSupplier,
       String[] aliases, boolean ignoredSiteProperty, boolean isHidden,
       ConsistencyCheckLevel consistencyCheckLevel, Scope scope, DisplayType displayType,
-      boolean isBuiltIn, boolean dynamic) {
+      boolean isBuiltIn, boolean dynamic, Function<Object, Boolean> valueValidationFunction) {
     mName = Preconditions.checkNotNull(name, "name");
     // TODO(binfan): null check after we add description for each property key
     mDescription = Strings.isNullOrEmpty(description) ? "N/A" : description;
@@ -7678,6 +7751,7 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     mDisplayType = displayType;
     mIsBuiltIn = isBuiltIn;
     mDynamic = dynamic;
+    mValueValidationFunction = valueValidationFunction;
   }
 
   /**
@@ -7685,7 +7759,7 @@ public final class PropertyKey implements Comparable<PropertyKey> {
    */
   private PropertyKey(String name) {
     this(name, null, new DefaultSupplier(() -> null, "null"), null, false, false,
-        ConsistencyCheckLevel.IGNORE, Scope.ALL, DisplayType.DEFAULT, true, true);
+        ConsistencyCheckLevel.IGNORE, Scope.ALL, DisplayType.DEFAULT, true, true, null);
   }
 
   /**
@@ -7868,6 +7942,17 @@ public final class PropertyKey implements Comparable<PropertyKey> {
    */
   public DisplayType getDisplayType() {
     return mDisplayType;
+  }
+
+  /**
+   * @param value the value to be validated
+   * @return whether the value is a valid value of the property key
+   */
+  public boolean validateValue(Object value) {
+    if (mValueValidationFunction == null) {
+      return true;
+    }
+    return mValueValidationFunction.apply(value);
   }
 
   private static final DeprecatedKeyChecker DEPRECATED_CHECKER = new DeprecatedKeyChecker();

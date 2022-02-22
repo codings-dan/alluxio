@@ -84,7 +84,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterators;
 import com.google.common.util.concurrent.Striped;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -393,11 +392,11 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
 
   @Override
   public CloseableIterator<JournalEntry> getJournalEntryIterator() {
-    Iterator<Block> it = mBlockStore.iterator();
+    Iterator<Block> blockStoreIterator = mBlockStore.iterator();
     Iterator<JournalEntry> blockIterator = new Iterator<JournalEntry>() {
       @Override
       public boolean hasNext() {
-        return it.hasNext();
+        return blockStoreIterator.hasNext();
       }
 
       @Override
@@ -405,7 +404,7 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
         if (!hasNext()) {
           throw new NoSuchElementException();
         }
-        Block block = it.next();
+        Block block = blockStoreIterator.next();
         BlockInfoEntry blockInfoEntry =
             BlockInfoEntry.newBuilder().setBlockId(block.getId())
                 .setLength(block.getMeta().getLength()).build();
@@ -418,8 +417,20 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
       }
     };
 
-    return CloseableIterator.noopCloseable(Iterators
-        .concat(CommonUtils.singleElementIterator(getContainerIdJournalEntry()), blockIterator));
+    CloseableIterator<JournalEntry> closeableIterator =
+        CloseableIterator.create(blockIterator, (whatever) -> {
+          if (blockStoreIterator instanceof CloseableIterator) {
+            final CloseableIterator<Block> c = (CloseableIterator<Block>) blockStoreIterator;
+            c.close();
+          } else {
+            // no op
+          }
+        });
+
+    return CloseableIterator.concat(
+        CloseableIterator.noopCloseable(
+            CommonUtils.singleElementIterator(getContainerIdJournalEntry())),
+        closeableIterator);
   }
 
   /**

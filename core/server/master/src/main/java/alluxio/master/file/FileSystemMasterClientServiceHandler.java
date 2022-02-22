@@ -38,6 +38,8 @@ import alluxio.grpc.DecommissionWorkersPOptions;
 import alluxio.grpc.DecommissionWorkersPResponse;
 import alluxio.grpc.DeletePRequest;
 import alluxio.grpc.DeletePResponse;
+import alluxio.grpc.ExistsPRequest;
+import alluxio.grpc.ExistsPResponse;
 import alluxio.grpc.FileSystemMasterClientServiceGrpc;
 import alluxio.grpc.FreePRequest;
 import alluxio.grpc.FreePResponse;
@@ -83,6 +85,7 @@ import alluxio.grpc.UpdateUfsModePRequest;
 import alluxio.grpc.UpdateUfsModePResponse;
 import alluxio.master.file.contexts.CheckAccessContext;
 import alluxio.master.file.contexts.CheckConsistencyContext;
+import alluxio.master.file.contexts.ExistsContext;
 import alluxio.master.file.contexts.CompleteFileContext;
 import alluxio.master.file.contexts.CreateDirectoryContext;
 import alluxio.master.file.contexts.CreateFileContext;
@@ -161,6 +164,17 @@ public final class FileSystemMasterClientServiceHandler
   }
 
   @Override
+  public void exists(ExistsPRequest request,
+          StreamObserver<ExistsPResponse> responseObserver) {
+    RpcUtils.call(LOG, () -> {
+      AlluxioURI pathUri = getAlluxioURI(request.getPath());
+      boolean exists = mFileSystemMaster.exists(pathUri,
+          ExistsContext.create(request.getOptions().toBuilder()));
+      return ExistsPResponse.newBuilder().setExists(exists).build();
+    }, "CheckExistence", "request=%s", responseObserver, request);
+  }
+
+  @Override
   public void completeFile(CompleteFilePRequest request,
       StreamObserver<CompleteFilePResponse> responseObserver) {
     RpcUtils.call(LOG, () -> {
@@ -228,7 +242,6 @@ public final class FileSystemMasterClientServiceHandler
   @Override
   public void getStatus(GetStatusPRequest request,
       StreamObserver<GetStatusPResponse> responseObserver) {
-    String path = request.getPath();
     GetStatusPOptions options = request.getOptions();
     RpcUtils.call(LOG, () -> {
       AlluxioURI pathUri = getAlluxioURI(request.getPath());
