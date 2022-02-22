@@ -96,21 +96,18 @@ public interface PageStore extends AutoCloseable {
    * @throws IOException when failed to clean up the specific location
    */
   static void initialize(PageStoreOptions options) throws IOException {
-    String[] rootPaths = options.getRootDir().split(",");
-    for (String rootPath : rootPaths) {
-      Files.createDirectories(Paths.get(rootPath));
-      LOG.info("Cleaning cache directory {}", rootPath);
-      try (Stream<Path> stream = Files.list(Paths.get(rootPath))) {
-        stream.forEach(path -> {
-          try {
-            FileUtils.deletePathRecursively(path.toString());
-          } catch (IOException e) {
-            Metrics.CACHE_CLEAN_ERRORS.inc();
-            LOG.warn("failed to delete {} in cache directory: {}", path,
-                e.toString());
-          }
-        });
-      }
+    String rootPath = options.getRootDir();
+    Files.createDirectories(Paths.get(rootPath));
+    LOG.info("Cleaning cache directory {}", rootPath);
+    try (Stream<Path> stream = Files.list(Paths.get(rootPath))) {
+      stream.forEach(path -> {
+        try {
+          FileUtils.deletePathRecursively(path.toString());
+        } catch (IOException e) {
+          Metrics.CACHE_CLEAN_ERRORS.inc();
+          LOG.warn("failed to delete {} in cache directory: {}", path, e.toString());
+        }
+      });
     }
   }
 

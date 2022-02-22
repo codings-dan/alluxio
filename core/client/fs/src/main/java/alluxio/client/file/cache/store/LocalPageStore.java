@@ -43,7 +43,7 @@ import javax.annotation.concurrent.NotThreadSafe;
 public class LocalPageStore implements PageStore {
   private static final Logger LOG = LoggerFactory.getLogger(LocalPageStore.class);
   private static final String ERROR_NO_SPACE_LEFT = "No space left on device";
-  private final String[] mRoots;
+  private final String mRoot;
   private final long mPageSize;
   private final long mCapacity;
   private final int mFileBuckets;
@@ -55,14 +55,15 @@ public class LocalPageStore implements PageStore {
    * @param options options for the local page store
    */
   public LocalPageStore(LocalPageStoreOptions options) {
-    mRoots = options.getRootDir().split(",");
+    mRoot = options.getRootDir();
     mPageSize = options.getPageSize();
     mCapacity = (long) (options.getCacheSize() / (1 + options.getOverheadRatio()));
     mFileBuckets = options.getFileBuckets();
-    // pattern encoding root_path/page_size(ulong)/bucket(uint)/file_id(str)/page_idx(ulong)
+    // normalize the path to deal with trailing slash
+    Path rootDir = Paths.get(mRoot);
+    // pattern encoding root_path/page_size(ulong)/bucket(uint)/file_id(str)/page_idx(ulong)/
     mPagePattern = Pattern.compile(
-        String.format("%s/%d/(\\d+)/([^/]+)/(\\d+)", "("
-            + options.getRootDir().replace(",", "|") + ")", mPageSize));
+        String.format("%s/%d/(\\d+)/([^/]+)/(\\d+)", Pattern.quote(rootDir.toString()), mPageSize));
   }
 
   @Override
@@ -83,7 +84,7 @@ public class LocalPageStore implements PageStore {
       Files.deleteIfExists(p);
       if (e.getMessage().contains(ERROR_NO_SPACE_LEFT)) {
         throw new ResourceExhaustedException(
-            String.format("%s is full, configured with %d bytes", getRoot(pageId), mCapacity), e);
+            String.format("%s is full, configured with %d bytes", mRoot, mCapacity), e);
       }
       throw new IOException("Failed to write file " + p + " for page " + pageId);
     }
@@ -158,15 +159,8 @@ public class LocalPageStore implements PageStore {
   @VisibleForTesting
   public Path getFilePath(PageId pageId) {
     // TODO(feng): encode fileId with URLEncoder to escape invalid characters for file name
-    return Paths.get(getRoot(pageId), Long.toString(mPageSize), getFileBucket(pageId.getFileId()),
+    return Paths.get(mRoot, Long.toString(mPageSize), getFileBucket(pageId.getFileId()),
         pageId.getFileId(), Long.toString(pageId.getPageIndex()));
-  }
-
-  private String getRoot(PageId pageId) {
-    // TODO(maobaolong): Refactor to support choose volume policy
-    int index = pageId.hashCode() % mRoots.length;
-    index = index < 0 ? index + mRoots.length : index;
-    return mRoots[index];
   }
 
   private String getFileBucket(String fileId) {
@@ -184,12 +178,12 @@ public class LocalPageStore implements PageStore {
       return null;
     }
     try {
-      String fileBucket = Preconditions.checkNotNull(matcher.group(2));
-      String fileId = Preconditions.checkNotNull(matcher.group(3));
+      String fileBucket = Preconditions.checkNotNull(matcher.group(1));
+      String fileId = Preconditions.checkNotNull(matcher.group(2));
       if (!fileBucket.equals(getFileBucket(fileId))) {
         return null;
       }
-      String fileName = Preconditions.checkNotNull(matcher.group(4));
+      String fileName = Preconditions.checkNotNull(matcher.group(3));
       long pageIndex = Long.parseLong(fileName);
       return new PageId(fileId, pageIndex);
     } catch (NumberFormatException e) {
@@ -225,11 +219,8 @@ public class LocalPageStore implements PageStore {
 
   @Override
   public Stream<PageInfo> getPages() throws IOException {
-    Stream<Path> stream = Stream.empty();
-    for (String root : mRoots) {
-      stream = Stream.concat(stream, Files.walk(Paths.get(root)));
-    }
-    return stream.filter(Files::isRegularFile).map(this::getPageInfo);
+    Path rootDir = Paths.get(mRoot);
+    return Files.walk(rootDir).filter(Files::isRegularFile).map(this::getPageInfo);
   }
 
   @Override
