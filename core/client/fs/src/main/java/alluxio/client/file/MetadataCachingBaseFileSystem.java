@@ -28,6 +28,7 @@ import alluxio.grpc.ListStatusPOptions;
 import alluxio.grpc.RenamePOptions;
 import alluxio.metrics.MetricKey;
 import alluxio.metrics.MetricsSystem;
+import alluxio.metrics.TxMetricKey;
 import alluxio.util.FileSystemOptions;
 import alluxio.util.ThreadUtils;
 import alluxio.wire.FileInfo;
@@ -280,12 +281,12 @@ public class MetadataCachingBaseFileSystem extends BaseFileSystem {
 
   private static final class Metrics {
     private static final Counter CLIENT_METADATA_CACHE_REFRESH_COUNT =
-        MetricsSystem.counter(MetricKey.CLIENT_METADATA_CACHE_REFRESH_COUNT.getName());
+        MetricsSystem.counter(TxMetricKey.CLIENT_METADATA_CACHE_REFRESH_COUNT.getName());
     private static final Counter CLIENT_METADATA_CACHE_DROP_COUNT =
-        MetricsSystem.counter(MetricKey.CLIENT_METADATA_CACHE_DROP_COUNT.getName());
+        MetricsSystem.counter(TxMetricKey.CLIENT_METADATA_CACHE_DROP_COUNT.getName());
      // TODO(dragonyliu): add more metrics to indicate the time
      //  of every refreshing client metadata cache
     private static final Counter CLIENT_METADATA_CACHE_REFRESH_TIME =
-        MetricsSystem.counter(MetricKey.CLIENT_METADATA_CACHE_REFRESH_TIME.getName());
+        MetricsSystem.counter(TxMetricKey.CLIENT_METADATA_CACHE_REFRESH_TIME.getName());
   }
 }

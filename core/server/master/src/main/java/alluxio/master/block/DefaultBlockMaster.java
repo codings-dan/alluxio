@@ -57,6 +57,7 @@ import alluxio.metrics.Metric;
 import alluxio.metrics.MetricInfo;
 import alluxio.metrics.MetricKey;
 import alluxio.metrics.MetricsSystem;
+import alluxio.metrics.TxMetricKey;
 import alluxio.proto.journal.Block.BlockContainerIdGeneratorEntry;
 import alluxio.proto.journal.Block.BlockInfoEntry;
 import alluxio.proto.journal.Block.DeleteBlockEntry;
@@ -313,7 +314,7 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
         this::getLostBlocksCount);
     if (ServerConfiguration.global().getBoolean(
         TxPropertyKey.MASTER_COUNT_TO_REMOVE_BLOCKS_ENABLE)) {
-      MetricsSystem.registerGaugeIfAbsent(MetricKey.MASTER_TO_REMOVE_BLOCK_COUNT.getName(),
+      MetricsSystem.registerGaugeIfAbsent(TxMetricKey.MASTER_TO_REMOVE_BLOCK_COUNT.getName(),
           this::getToRemoveBlockCount);
     }
   }

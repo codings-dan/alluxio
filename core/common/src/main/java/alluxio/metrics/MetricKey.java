@@ -352,11 +352,6 @@ public final class MetricKey implements Comparable<MetricKey> {
           .setDescription("Count of lost unique blocks")
           .setMetricType(MetricType.GAUGE)
           .build();
-  public static final MetricKey MASTER_TO_REMOVE_BLOCK_COUNT =
-      new Builder("Master.ToRemoveBlockCount")
-          .setDescription("Count of blocks to remove")
-          .setMetricType(MetricType.GAUGE)
-          .build();
   public static final MetricKey MASTER_LOST_FILE_COUNT =
       new Builder("Master.LostFileCount")
           .setDescription("Count of lost files. This number is cached and may not be in sync with "
@@ -893,21 +888,6 @@ public final class MetricKey implements Comparable<MetricKey> {
               + "by all clients")
           .setMetricType(MetricType.COUNTER)
           .build();
-  public static final MetricKey CLUSTER_METADATA_CACHE_REFRESH_COUNT =
-      new Builder("Cluster.MetadataCacheRefreshCount")
-          .setDescription("Total number of refreshing client metadata cache by all clients")
-          .setMetricType(MetricType.COUNTER)
-          .build();
-  public static final MetricKey CLUSTER_METADATA_CACHE_DROP_COUNT =
-      new Builder("Cluster.MetadataCacheDropCount")
-          .setDescription("Total number of dropping client metadata cache by all clients")
-          .setMetricType(MetricType.COUNTER)
-          .build();
-  public static final MetricKey CLUSTER_METADATA_CACHE_REFRESH_TIME =
-      new Builder("Cluster.MetadataCacheRefreshTime")
-          .setDescription("Total time of refreshing client metadata cache by all clients")
-          .setMetricType(MetricType.COUNTER)
-          .build();
   public static final MetricKey CLUSTER_BYTES_READ_LOCAL_THROUGHPUT =
       new Builder("Cluster.BytesReadLocalThroughput")
           .setDescription("Bytes per minute throughput "
@@ -1036,12 +1016,6 @@ public final class MetricKey implements Comparable<MetricKey> {
           .setDescription("Display current leader id")
           .setMetricType(MetricType.GAUGE)
           .build();
-  public static final MetricKey CLUSTER_REGISTER_CLIENTS =
-      new Builder("Cluster.RegisterClients")
-          .setDescription("Total number of client register in master inside the cluster")
-          .setMetricType(MetricType.GAUGE)
-          .build();
-
   // Server metrics shared by Master, Worker and other Alluxio servers
   public static final MetricKey TOTAL_EXTRA_TIME =
       new Builder("Server.JvmPauseMonitorTotalExtraTime")
@@ -1763,24 +1737,6 @@ public final class MetricKey implements Comparable<MetricKey> {
               + "alluxio.client.file.MetadataCachingBaseFileSystem.")
           .setMetricType(MetricType.GAUGE)
           .setIsClusterAggregated(false)
-          .build();
-  public static final MetricKey CLIENT_METADATA_CACHE_REFRESH_COUNT =
-      new Builder("Client.MetadataCacheRefreshCount")
-          .setDescription("Number of refreshing client metadata cache.")
-          .setMetricType(MetricType.COUNTER)
-          .setIsClusterAggregated(true)
-          .build();
-  public static final MetricKey CLIENT_METADATA_CACHE_DROP_COUNT =
-      new Builder("Client.MetadataCacheDropCount")
-          .setDescription("Number of dropping client metadata cache.")
-          .setMetricType(MetricType.COUNTER)
-          .setIsClusterAggregated(true)
-          .build();
-  public static final MetricKey CLIENT_METADATA_CACHE_REFRESH_TIME =
-      new Builder("Client.MetadataCacheRefreshTime")
-          .setDescription("The total time of refreshing client metadata cache.")
-          .setMetricType(MetricType.COUNTER)
-          .setIsClusterAggregated(true)
           .build();
 
   // Fuse operation timer and failure counter metrics are added dynamically.

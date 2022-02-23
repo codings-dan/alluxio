@@ -132,6 +132,7 @@ import alluxio.metrics.MetricInfo;
 import alluxio.metrics.MetricKey;
 import alluxio.metrics.MetricsSystem;
 import alluxio.metrics.TimeSeries;
+import alluxio.metrics.TxMetricKey;
 import alluxio.proto.journal.File;
 import alluxio.proto.journal.File.NewBlockEntry;
 import alluxio.proto.journal.File.RenameEntry;
@@ -548,7 +549,7 @@ public class DefaultFileSystemMaster extends CoreMaster
     Metrics.registerGauges(mUfsManager, mInodeTree);
 
     mUriTranslator = UriTranslator.Factory.create(this, mMountTable, mInodeTree);
-    MetricsSystem.registerGaugeIfAbsent(MetricKey.CLUSTER_REGISTER_CLIENTS.getName(),
+    MetricsSystem.registerGaugeIfAbsent(TxMetricKey.CLUSTER_REGISTER_CLIENTS.getName(),
         mClients::size);
   }
 

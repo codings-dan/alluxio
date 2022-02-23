@@ -17,6 +17,7 @@ import alluxio.metrics.MetricInfo;
 import alluxio.metrics.MetricKey;
 import alluxio.metrics.MetricsSystem;
 import alluxio.metrics.MetricsSystem.InstanceType;
+import alluxio.metrics.TxMetricKey;
 import alluxio.resource.LockResource;
 
 import com.codahale.metrics.Counter;
@@ -206,14 +207,14 @@ public class MetricsStore {
           MetricKey.CLIENT_BYTES_WRITTEN_LOCAL.getMetricName()),
           MetricsSystem.counter(MetricKey.CLUSTER_BYTES_WRITTEN_LOCAL.getName()));
       mClusterCounters.putIfAbsent(new ClusterCounterKey(InstanceType.CLIENT,
-          MetricKey.CLIENT_METADATA_CACHE_REFRESH_COUNT.getMetricName()),
-          MetricsSystem.counter(MetricKey.CLUSTER_METADATA_CACHE_REFRESH_COUNT.getName()));
+          TxMetricKey.CLIENT_METADATA_CACHE_REFRESH_COUNT.getMetricName()),
+          MetricsSystem.counter(TxMetricKey.CLUSTER_METADATA_CACHE_REFRESH_COUNT.getName()));
       mClusterCounters.putIfAbsent(new ClusterCounterKey(InstanceType.CLIENT,
-          MetricKey.CLIENT_METADATA_CACHE_DROP_COUNT.getMetricName()),
-          MetricsSystem.counter(MetricKey.CLUSTER_METADATA_CACHE_DROP_COUNT.getName()));
+          TxMetricKey.CLIENT_METADATA_CACHE_DROP_COUNT.getMetricName()),
+          MetricsSystem.counter(TxMetricKey.CLUSTER_METADATA_CACHE_DROP_COUNT.getName()));
       mClusterCounters.putIfAbsent(new ClusterCounterKey(InstanceType.CLIENT,
-          MetricKey.CLIENT_METADATA_CACHE_REFRESH_TIME.getMetricName()),
-          MetricsSystem.counter(MetricKey.CLUSTER_METADATA_CACHE_REFRESH_TIME.getName()));
+          TxMetricKey.CLIENT_METADATA_CACHE_REFRESH_TIME.getMetricName()),
+          MetricsSystem.counter(TxMetricKey.CLUSTER_METADATA_CACHE_REFRESH_TIME.getName()));
 
       // special metrics that have multiple worker metrics to summarize from
       // always use the full name instead of metric name for those metrics
