@@ -287,7 +287,7 @@ public abstract class ObjectUnderFileSystem extends BaseUnderFileSystem {
     }
 
     /**
-     * Get the combined result from all batches.
+     * Gets the combined result from all batches.
      *
      * @return a list of inputs for successful operations
      * @throws IOException if a non-Alluxio error occurs
@@ -944,7 +944,8 @@ public abstract class ObjectUnderFileSystem extends BaseUnderFileSystem {
     String dir = stripPrefixIfPresent(path);
     ObjectListingChunk objs = getObjectListingChunk(dir, recursive);
     // If there are, this is a folder and we can create the necessary metadata
-    if (objs != null && ((objs.getObjectStatuses() != null && objs.getObjectStatuses().length > 0)
+    if (objs != null && !isRoot(dir)
+        && ((objs.getObjectStatuses() != null && objs.getObjectStatuses().length > 0)
         || (objs.getCommonPrefixes() != null && objs.getCommonPrefixes().length > 0))) {
       // Do not recreate the breadcrumb if it already exists
       String folderName = convertToFolderName(dir);

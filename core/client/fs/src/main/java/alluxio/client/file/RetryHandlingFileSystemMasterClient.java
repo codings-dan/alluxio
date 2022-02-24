@@ -19,6 +19,8 @@ import alluxio.grpc.CheckAccessPOptions;
 import alluxio.grpc.CheckAccessPRequest;
 import alluxio.grpc.CheckConsistencyPOptions;
 import alluxio.grpc.CheckConsistencyPRequest;
+import alluxio.grpc.ClientRegisterPRequest;
+import alluxio.grpc.CommandHeartbeatPRequest;
 import alluxio.grpc.CompleteFilePOptions;
 import alluxio.grpc.CompleteFilePRequest;
 import alluxio.grpc.CreateDirectoryPOptions;
@@ -28,9 +30,12 @@ import alluxio.grpc.CreateFilePRequest;
 import alluxio.grpc.DecommissionWorkersPOptions;
 import alluxio.grpc.DeletePOptions;
 import alluxio.grpc.DeletePRequest;
+import alluxio.grpc.ExistsPOptions;
+import alluxio.grpc.ExistsPRequest;
 import alluxio.grpc.FileSystemMasterClientServiceGrpc;
 import alluxio.grpc.FreePOptions;
 import alluxio.grpc.FreePRequest;
+import alluxio.grpc.GetClientIdPRequest;
 import alluxio.grpc.GetFilePathPRequest;
 import alluxio.grpc.GetMountTablePRequest;
 import alluxio.grpc.GetNewBlockIdForFilePOptions;
@@ -67,6 +72,7 @@ import alluxio.master.MasterClientContext;
 import alluxio.retry.RetryUtils;
 import alluxio.security.authorization.AclEntry;
 import alluxio.util.FileSystemOptions;
+import alluxio.wire.ClientIdentifier;
 import alluxio.wire.SyncPointInfo;
 
 import org.slf4j.Logger;
@@ -180,6 +186,15 @@ public final class RetryHandlingFileSystemMasterClient extends AbstractMasterCli
       throws AlluxioStatusException {
     retryRPC(() -> mClient.remove(DeletePRequest.newBuilder().setPath(getTransportPath(path))
         .setOptions(options).build()), RPC_LOG, "Delete",
+        "path=%s,options=%s", path, options);
+  }
+
+  @Override
+  public boolean exists(final AlluxioURI path, final ExistsPOptions options)
+      throws AlluxioStatusException {
+    return retryRPC(() -> mClient.exists(ExistsPRequest.newBuilder()
+        .setPath(getTransportPath(path))
+        .setOptions(options).build()).getExists(), RPC_LOG, "Exists",
         "path=%s,options=%s", path, options);
   }
 
@@ -394,6 +409,32 @@ public final class RetryHandlingFileSystemMasterClient extends AbstractMasterCli
     retryRPC(() -> mClient.decommissionWorkers(optionsBuilder.addAllExcludedWorkers(
         excludedWorkerSet.stream().collect(Collectors.toSet())).build()), RPC_LOG,
         "DecommissionWorkers", "");
+  }
+
+  @Override
+  public long heartbeat(long clientId, long metadataSize)
+      throws AlluxioStatusException {
+    return retryRPC(() ->
+        mClient.commandHeartbeat(CommandHeartbeatPRequest.newBuilder().setClientId(clientId)
+            .setMetadataCacheSize(metadataSize).build()).getOptions().getJournalId(), RPC_LOG,
+        "CommandHeartbeat", "");
+  }
+
+  @Override
+  public void register(long clientId, long startTime)
+      throws AlluxioStatusException {
+    retryRPC(() ->
+        mClient.clientRegister(ClientRegisterPRequest.newBuilder().setClientId(clientId)
+            .setStartTime(startTime).build()), RPC_LOG, "ClientRegister", "");
+  }
+
+  @Override
+  public long getClientId(ClientIdentifier clientIdentifier)
+      throws AlluxioStatusException {
+    return retryRPC(() ->
+        mClient.getClientId(GetClientIdPRequest.newBuilder()
+                .setClientIdentifier(GrpcUtils.toProto(clientIdentifier)).build())
+            .getClientId(), RPC_LOG, "GetClientId", "");
   }
 
   /**

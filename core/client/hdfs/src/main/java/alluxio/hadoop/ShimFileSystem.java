@@ -15,15 +15,24 @@ import alluxio.AlluxioURI;
 import alluxio.Constants;
 import alluxio.annotation.PublicApi;
 import alluxio.client.file.URIStatus;
+import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.PropertyKey;
+import alluxio.conf.TxPropertyKey;
+import alluxio.exception.AlluxioException;
 import alluxio.exception.InvalidPathException;
+import alluxio.exception.status.UnavailableException;
+import alluxio.grpc.DeletePOptions;
 import alluxio.util.io.PathUtils;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -36,6 +45,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +69,14 @@ public class ShimFileSystem extends AbstractFileSystem {
 
   private org.apache.hadoop.fs.FileSystem mByPassFs = null;
 
+  private boolean mFallbackEnabled;
+
+  private FallbackManager mFallbackManager = null;
+
+  private ReentrantReadWriteLock mHadInitLock = new ReentrantReadWriteLock();
+
+  private boolean mAlluxioFsHadInited = false;
+
   /**
    * Constructs a new {@link ShimFileSystem}.
    */
@@ -77,10 +95,22 @@ public class ShimFileSystem extends AbstractFileSystem {
   }
 
   public synchronized void initialize(URI uri, Configuration conf) throws IOException {
-    super.initialize(uri, conf);
-    if (mAlluxioConf.isSet(PropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST)) {
+    try {
+      super.initialize(uri, conf);
+    } catch (UnavailableException e) {
+      LOG.warn("Failed to initialize mAlluxioFileSystem to({},{}) e:{}", uri, conf, e);
+      setAlluxioFsHadInited(false);
+    }
+    setAlluxioFsHadInited(true);
+    LOG.debug("Successfully to mAlluxioFileSystem to {}", mFileSystem);
+
+    mFallbackEnabled = mAlluxioConf.getBoolean(TxPropertyKey.USER_FALLBACK_ENABLED);
+    if (mFallbackEnabled) {
+      mFallbackManager = new FallbackManager(mAlluxioConf);
+    }
+    if (mAlluxioConf.isSet(TxPropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST)) {
       List<String> prefixes =
-          mAlluxioConf.getList(PropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST, ",");
+          mAlluxioConf.getList(TxPropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST, ",");
       try {
         for (String prefix : prefixes) {
           prefix = prefix.trim();
@@ -90,26 +120,79 @@ public class ShimFileSystem extends AbstractFileSystem {
         }
       } catch (URISyntaxException e) {
         throw new IOException(String.format("By-pass configuration not correct: %s",
-            mAlluxioConf.get(PropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST)), e);
+            mAlluxioConf.get(TxPropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST)), e);
       }
     }
-    if (!mByPassedPrefixSet.isEmpty()) {
+    if (!mByPassedPrefixSet.isEmpty() || mFallbackEnabled) {
       try {
         Class<? extends org.apache.hadoop.fs.FileSystem> clazz =
-            org.apache.hadoop.fs.FileSystem.getFileSystemClass(uri.getScheme(), null);
+            org.apache.hadoop.fs.FileSystem.getFileSystemClass(uri.getScheme(),
+                getByPassFsImplConf(mAlluxioConf));
         mByPassFs = clazz.newInstance();
+        LOG.debug("Successfully load native fs ({},{}) fro {}", uri, conf, mByPassFs);
       } catch (Exception e) {
-        throw new IOException(
-            String.format("Failed to load native fs for bypassing scheme: %s. Error: %s",
-                uri.getScheme()), e);
+        LOG.error("Failed to load native fs for bypassing scheme: {}. Error: {}", uri.getScheme(),
+            e.getStackTrace());
+        throw new IOException(String.format(
+            "Failed to load native fs for bypassing scheme: %s. Error: %s", uri.getScheme()), e);
       }
       try {
         mByPassFs.initialize(uri, conf);
+        LOG.debug("Successfully initialize ({},{}) fro {}", uri, conf, mByPassFs);
       } catch (Exception e) {
+        LOG.error("Failed to initialize bypass fs for scheme: {}. Error: {}", uri.getScheme(),
+            e.getStackTrace());
         throw new IOException(
             String.format("Failed to initialize bypass fs for scheme: %s.", uri.getScheme()), e);
       }
     }
+  }
+
+  private Configuration getByPassFsImplConf(AlluxioConfiguration alluxioConf) throws IOException {
+    if (alluxioConf.isSet(TxPropertyKey.USER_SHIMFS_BYPASS_UFS_IMPL_LIST)) {
+      List<String> implList =
+          mAlluxioConf.getList(TxPropertyKey.USER_SHIMFS_BYPASS_UFS_IMPL_LIST, ",");
+      Configuration conf = new Configuration();
+      for (String impl : implList) {
+        List<String> fsImpl = Lists.newArrayList(Splitter.on(":").trimResults().omitEmptyStrings()
+            .split(impl));
+        if (fsImpl.size() != 2) {
+          throw new IOException(String.format("bad Property:%s" ,
+              TxPropertyKey.USER_SHIMFS_BYPASS_UFS_IMPL_LIST));
+        }
+        conf.set(fsImpl.get(0), fsImpl.get(1));
+        LOG.debug("Use {} item conf [{}={}] to init ByPassFs.",
+            TxPropertyKey.USER_SHIMFS_BYPASS_UFS_IMPL_LIST, fsImpl.get(0), fsImpl.get(1));
+      }
+      return conf;
+    }
+    return null;
+  }
+
+  public void setAlluxioFsHadInited(boolean hadInited) {
+    try {
+      mHadInitLock.writeLock().lock();
+      mAlluxioFsHadInited = hadInited;
+    } finally {
+      mHadInitLock.writeLock().unlock();
+    }
+  }
+
+  public boolean alluxioFsHadInited() {
+    try {
+      mHadInitLock.readLock().lock();
+      return mAlluxioFsHadInited;
+    } finally {
+      mHadInitLock.readLock().unlock();
+    }
+  }
+
+  public void reInitAlluxioFs(URI uri, Configuration conf) throws IOException {
+    if (alluxioFsHadInited()) {
+      return;
+    }
+    super.initialize(uri, conf, null);
+    setAlluxioFsHadInited(true);
   }
 
   public String getScheme() {
@@ -160,6 +243,16 @@ public class ShimFileSystem extends AbstractFileSystem {
   }
 
   private boolean pathByPassed(Path path) throws IOException {
+    if (mFallbackEnabled && mFallbackManager.needFallbackStatus()) {
+      LOG.debug("it will fallback for path:{}", path);
+      return true;
+    }
+
+    if (!alluxioFsHadInited()) {
+      LOG.debug("AlluxioFileSystem had not be inited, will pass for path:{}", path);
+      return true;
+    }
+
     if (mByPassedPrefixSet.isEmpty()) {
       return false;
     }
@@ -185,125 +278,301 @@ public class ShimFileSystem extends AbstractFileSystem {
 
   @Override
   public FSDataOutputStream create(Path path, FsPermission permission, boolean overwrite,
-      int bufferSize, short replication, long blockSize, Progressable progress)
-      throws IOException {
+      int bufferSize, short replication, long blockSize, Progressable progress) throws IOException {
     path = getFullPath(getUri(), path);
-    if (pathByPassed(path)) {
-      return mByPassFs.create(path, permission, overwrite, bufferSize,
-          replication, blockSize, progress);
+    if (!pathByPassed(path)) {
+      try {
+        return super.create(path, permission, overwrite, bufferSize, replication, blockSize,
+            progress);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
     }
-    return super.create(path, permission, overwrite, bufferSize, replication, blockSize, progress);
+    return mByPassFs.create(path, permission, overwrite, bufferSize, replication, blockSize,
+        progress);
   }
 
   public FSDataOutputStream createNonRecursive(Path path, FsPermission permission,
       boolean overwrite, int bufferSize, short replication, long blockSize, Progressable progress)
       throws IOException {
     path = getFullPath(getUri(), path);
-    if (pathByPassed(path)) {
-      return mByPassFs.createNonRecursive(
-          path, permission, overwrite, bufferSize, replication, blockSize,
-          progress);
+    if (!pathByPassed(path)) {
+      try {
+        return super.createNonRecursive(path, permission, overwrite, bufferSize, replication,
+            blockSize, progress);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
     }
-    return super.createNonRecursive(
-        path, permission, overwrite, bufferSize, replication, blockSize, progress);
+    return mByPassFs.createNonRecursive(path, permission, overwrite, bufferSize, replication,
+        blockSize, progress);
   }
 
   public FSDataOutputStream append(Path path, int bufferSize, Progressable progress)
       throws IOException {
     path = getFullPath(getUri(), path);
-    if (pathByPassed(path)) {
-      return mByPassFs.append(path, bufferSize, progress);
+    if (!pathByPassed(path)) {
+      try {
+        return super.append(path, bufferSize, progress);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
     }
-    return super.append(path, bufferSize, progress);
+    return mByPassFs.append(path, bufferSize, progress);
   }
 
   public boolean delete(Path path, boolean recursive) throws IOException {
     path = getFullPath(getUri(), path);
-    if (pathByPassed(path)) {
-      return mByPassFs.delete(path, recursive);
+    if (!pathByPassed(path)) {
+      try {
+        return super.delete(path, recursive);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
     }
-    return super.delete(path, recursive);
+    return mByPassFs.delete(path, recursive);
   }
 
   public BlockLocation[] getFileBlockLocations(FileStatus file, long start, long len)
       throws IOException {
     Path path = getFullPath(getUri(), file.getPath());
-    file.setPath(path);
-    if (pathByPassed(path)) {
-      return mByPassFs.getFileBlockLocations(file, start, len);
+    if (!pathByPassed(path)) {
+      try {
+        return super.getFileBlockLocations(path, start, len);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
     }
-    return super.getFileBlockLocations(file, start, len);
+    return mByPassFs.getFileBlockLocations(path, start, len);
   }
 
   public boolean setReplication(Path path, short replication) throws IOException {
     path = getFullPath(getUri(), path);
-    if (pathByPassed(path)) {
-      return mByPassFs.setReplication(path, replication);
+    if (!pathByPassed(path)) {
+      try {
+        return super.setReplication(path, replication);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
     }
-    return super.setReplication(path, replication);
+    return mByPassFs.setReplication(path, replication);
   }
 
   public FileStatus getFileStatus(Path path) throws IOException {
     path = getFullPath(getUri(), path);
-    if (pathByPassed(path)) {
-      return mByPassFs.getFileStatus(path);
+    if (!pathByPassed(path)) {
+      try {
+        return super.getFileStatus(path);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
     }
-    return super.getFileStatus(path);
+    return mByPassFs.getFileStatus(path);
   }
 
   public void setOwner(Path path, String username, String groupname) throws IOException {
     path = getFullPath(getUri(), path);
-    if (pathByPassed(path)) {
-      mByPassFs.setOwner(path, username, groupname);
+    if (!pathByPassed(path)) {
+      try {
+        super.setOwner(path, username, groupname);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
     } else {
-      super.setOwner(path, username, groupname);
+      mByPassFs.setOwner(path, username, groupname);
     }
   }
 
   public void setPermission(Path path, FsPermission permission) throws IOException {
     path = getFullPath(getUri(), path);
-    if (pathByPassed(path)) {
-      mByPassFs.setPermission(path, permission);
+    if (!pathByPassed(path)) {
+      try {
+        super.setPermission(path, permission);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
     } else {
-      super.setPermission(path, permission);
+      mByPassFs.setPermission(path, permission);
     }
   }
 
   public FileStatus[] listStatus(Path path) throws IOException {
     path = getFullPath(getUri(), path);
-    if (pathByPassed(path)) {
-      return mByPassFs.listStatus(path);
+    if (!pathByPassed(path)) {
+      try {
+        return super.listStatus(path);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
     }
-    return super.listStatus(path);
+    return mByPassFs.listStatus(path);
   }
 
   public boolean mkdirs(Path path, FsPermission permission) throws IOException {
     path = getFullPath(getUri(), path);
-    if (pathByPassed(path)) {
-      return mByPassFs.mkdirs(path, permission);
+    if (!pathByPassed(path)) {
+      try {
+        return super.mkdirs(path, permission);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
     }
-    return super.mkdirs(path, permission);
+    return mByPassFs.mkdirs(path, permission);
   }
 
   public FSDataInputStream open(Path path, int bufferSize) throws IOException {
     path = getFullPath(getUri(), path);
-    if (pathByPassed(path)) {
-      return mByPassFs.open(path, bufferSize);
+    if (!pathByPassed(path)) {
+      try {
+        return super.open(path, bufferSize);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
     }
-    return super.open(path, bufferSize);
+    return mByPassFs.open(path, bufferSize);
   }
 
   public boolean rename(Path src, Path dst) throws IOException {
     src = getFullPath(getUri(), src);
     dst = getFullPath(getUri(), dst);
-    if ((pathByPassed(src) ^ pathByPassed(dst)) != false) {
-      throw new IOException(
-          "Renaming across by-pass boundary is not supported.");
-    }
-    if (pathByPassed(src)) {
+    boolean srcBypassed = pathByPassed(src);
+    boolean dstBypassed = pathByPassed(dst);
+
+    if (srcBypassed && dstBypassed) {
       return mByPassFs.rename(src, dst);
     }
-    return super.rename(src, dst);
+    if (!srcBypassed && !dstBypassed) {
+      return super.rename(src, dst);
+    }
+    // here only one is by-pass
+    // FIXME: Across schema cannot support currently, we will fix it.
+    if (srcBypassed) {
+      try {
+        mFileSystem.loadMetadata(getAlluxioPath(dst));
+      } catch (AlluxioException e) {
+        LOG.warn("rename failed: {}", e.getMessage());
+        return false;
+      }
+    }
+    if (dstBypassed) {
+      try {
+        mFileSystem.delete(getAlluxioPath(src),
+            DeletePOptions.newBuilder().setRecursive(true).setAlluxioOnly(true).build());
+      } catch (AlluxioException e) {
+        LOG.warn("rename failed: {}", e.getMessage());
+        return false;
+      }
+    }
+    return mByPassFs.rename(src, dst);
+  }
+
+  public void setWorkingDirectory(Path path) {
+    path = getFullPath(getUri(), path);
+    try {
+      if (!pathByPassed(path)) {
+        super.setWorkingDirectory(path);
+        return;
+      }
+    } catch (UnavailableException e) {
+      mFallbackManager.markFallBack(this);
+    } catch (IOException e) {
+      LOG.error("path:{} setWorkingDirectory appear exception {}", path, e);
+    }
+    mByPassFs.setWorkingDirectory(path);
+  }
+
+  public FileChecksum getFileChecksum(Path path) throws IOException {
+    path = getFullPath(getUri(), path);
+    if (!pathByPassed(path)) {
+      try {
+        return super.getFileChecksum(path);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
+    }
+    return mByPassFs.getFileChecksum(path);
+  }
+
+  public void setXAttr(Path path, String name, byte[] value) throws IOException {
+    path = getFullPath(getUri(), path);
+    if (!pathByPassed(path)) {
+      try {
+        super.setXAttr(path, name, value);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
+    } else {
+      mByPassFs.setXAttr(path, name, value);
+    }
+  }
+
+  public byte[] getXAttr(Path path, String name) throws IOException {
+    path = getFullPath(getUri(), path);
+    if (!pathByPassed(path)) {
+      try {
+        return super.getXAttr(path, name);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
+    }
+    return mByPassFs.getXAttr(path, name);
+  }
+
+  public Map<String, byte[]> getXAttrs(Path path) throws IOException {
+    path = getFullPath(getUri(), path);
+    if (!pathByPassed(path)) {
+      try {
+        return super.getXAttrs(path);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
+    }
+    return mByPassFs.getXAttrs(path);
+  }
+
+  public void removeXAttr(Path path, String name) throws IOException {
+    path = getFullPath(getUri(), path);
+    if (!pathByPassed(path)) {
+      try {
+        super.removeXAttr(path, name);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
+    } else {
+      mByPassFs.removeXAttr(path, name);
+    }
+  }
+
+  public List<String> listXAttrs(Path path) throws IOException {
+    path = getFullPath(getUri(), path);
+    if (!pathByPassed(path)) {
+      try {
+        return super.listXAttrs(path);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
+    }
+    return mByPassFs.listXAttrs(path);
+  }
+
+  public ContentSummary getContentSummary(Path path) throws IOException {
+    path = getFullPath(getUri(), path);
+    if (!pathByPassed(path)) {
+      try {
+        return super.getContentSummary(path);
+      } catch (UnavailableException e) {
+        mFallbackManager.markFallBack(this);
+      }
+    }
+    return mByPassFs.getContentSummary(path);
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (mByPassFs != null) {
+      mByPassFs.close();
+    }
+    super.close();
   }
 
   @VisibleForTesting

@@ -22,6 +22,7 @@ import alluxio.grpc.CompleteFilePOptions;
 import alluxio.grpc.CreateDirectoryPOptions;
 import alluxio.grpc.CreateFilePOptions;
 import alluxio.grpc.DeletePOptions;
+import alluxio.grpc.ExistsPOptions;
 import alluxio.grpc.FreePOptions;
 import alluxio.grpc.GetStatusPOptions;
 import alluxio.grpc.ListStatusPOptions;
@@ -34,6 +35,7 @@ import alluxio.grpc.SetAttributePOptions;
 import alluxio.grpc.UpdateUfsModePOptions;
 import alluxio.master.MasterClientContext;
 import alluxio.security.authorization.AclEntry;
+import alluxio.wire.ClientIdentifier;
 import alluxio.wire.MountPointInfo;
 import alluxio.wire.SyncPointInfo;
 
@@ -121,6 +123,15 @@ public interface FileSystemMasterClient extends Client {
    * @param options method options
    */
   void delete(AlluxioURI path, DeletePOptions options) throws AlluxioStatusException;
+
+  /**
+   * Checks whether a file or directory exists.
+   *
+   * @param path the file path to check existence
+   * @param options the method options
+   * @return whether the file path exists
+   */
+  boolean exists(AlluxioURI path, ExistsPOptions options) throws AlluxioStatusException;
 
   /**
    * Frees a file.
@@ -312,4 +323,32 @@ public interface FileSystemMasterClient extends Client {
    */
   void decommissionWorkers(boolean addOnly, final Set<String> excludedWorkerSet)
       throws AlluxioStatusException;
+
+  /**
+   * Transports the information of the client and get journal id from master.
+   * @param clientId the client id
+   * @param metadataSize the metadata cache size of client
+   * @return the journal id of master
+   * @throws AlluxioStatusException
+   */
+  default long heartbeat(long clientId, long metadataSize)
+      throws AlluxioStatusException {
+    return -1;
+  }
+
+  /**
+   * Register client to master.
+   * @param clientId the client id
+   * @param registerTime the client register time
+   * @throws AlluxioStatusException
+   */
+  default void register(long clientId, long registerTime)
+      throws AlluxioStatusException {
+    return;
+  }
+
+  default long getClientId(ClientIdentifier clientIdentifier)
+      throws AlluxioStatusException {
+    return -1;
+  }
 }

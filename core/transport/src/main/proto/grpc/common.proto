@@ -124,6 +124,12 @@ message WorkerNetAddress {
   optional string containerHost = 7;
 }
 
+message ClientIdentifier {
+  optional string host = 1;
+  optional string containerHost = 2;
+  optional int32 pid = 3;
+}
+
 message BlockStoreLocationProto {
   optional string tierAlias = 1;
   optional string mediumType = 2;

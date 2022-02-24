@@ -12,8 +12,8 @@
 package alluxio.master.file.uritranslator;
 
 import alluxio.AlluxioURI;
-import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.InvalidPathException;
 import alluxio.master.file.FileSystemMaster;
 import alluxio.master.file.meta.InodeTree;
@@ -38,7 +38,19 @@ public interface UriTranslator {
     public static UriTranslator create(FileSystemMaster master, MountTable mountTable,
         InodeTree inodeTree) {
       String className =
-          ServerConfiguration.get(PropertyKey.MASTER_URI_TRANSLATOR_IMPL);
+          ServerConfiguration.get(TxPropertyKey.MASTER_URI_TRANSLATOR_IMPL);
+      return create(master, mountTable, inodeTree, className);
+    }
+
+    /**
+     * @param master Alluxio file system master
+     * @param mountTable Alluxio mount table
+     * @param inodeTree inode tree of the file system master
+     * @return the generated {@link UriTranslator}
+     */
+    public static UriTranslator create(FileSystemMaster master, MountTable mountTable,
+        InodeTree inodeTree, String className) {
+
       Class<?> providerClass;
       try {
         providerClass = Class.forName(className);

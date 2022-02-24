@@ -13,6 +13,7 @@ package alluxio.client.metrics;
 
 import alluxio.ClientContext;
 import alluxio.Constants;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.status.AlluxioStatusException;
 import alluxio.exception.status.UnavailableException;
 import alluxio.grpc.ClientMetrics;
@@ -121,7 +122,9 @@ public final class ClientMasterSync {
       InetSocketAddress masterAddr = mInquireClient.getPrimaryRpcAddress();
       mContext.loadConf(masterAddr, true, false);
     } catch (UnavailableException e) {
-      SAMPLING_LOG.error("Failed to get master address during initialization", e);
+      if (!mContext.getClusterConf().getBoolean(TxPropertyKey.USER_FALLBACK_ENABLED)) {
+        SAMPLING_LOG.error("Failed to get master address during initialization", e);
+      }
       return false;
     } catch (AlluxioStatusException ae) {
       SAMPLING_LOG.error("Failed to load configuration from meta master during initialization", ae);

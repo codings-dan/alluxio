@@ -1,0 +1,86 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Clients Shallow component Matches snapshot 1`] = `
+<div
+  className="clients-page"
+>
+  <div
+    className="container-fluid"
+  >
+    <div
+      className="row"
+    >
+      <div
+        className="col-12"
+      >
+        <h5>
+          Live Clients
+        </h5>
+        <Table
+          hover={true}
+          responsiveTag="div"
+          tag="table"
+        >
+          <thead>
+            <tr>
+              <th>
+                Node Name(Container Host)
+              </th>
+              <th>
+                PID
+              </th>
+              <th>
+                Client Id
+              </th>
+              <th>
+                Last Heartbeat
+              </th>
+              <th>
+                Client Metadata Cache Size
+              </th>
+              <th>
+                Up time
+              </th>
+            </tr>
+          </thead>
+          <tbody />
+        </Table>
+      </div>
+    </div>
+    <div
+      className="row"
+    >
+      <div
+        className="col-12"
+      >
+        <h5>
+          Lost Clients
+        </h5>
+        <Table
+          hover={true}
+          responsiveTag="div"
+          tag="table"
+        >
+          <thead>
+            <tr>
+              <th>
+                Node Name(Container Host)
+              </th>
+              <th>
+                PID
+              </th>
+              <th>
+                Clients Id
+              </th>
+              <th>
+                Last Heartbeat
+              </th>
+            </tr>
+          </thead>
+          <tbody />
+        </Table>
+      </div>
+    </div>
+  </div>
+</div>
+`;

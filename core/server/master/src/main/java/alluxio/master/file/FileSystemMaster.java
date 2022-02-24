@@ -24,11 +24,13 @@ import alluxio.exception.InvalidFileSizeException;
 import alluxio.exception.InvalidPathException;
 import alluxio.exception.UnexpectedAlluxioException;
 import alluxio.exception.status.InvalidArgumentException;
+import alluxio.exception.status.NotFoundException;
 import alluxio.exception.status.UnavailableException;
 import alluxio.grpc.SetAclAction;
 import alluxio.master.Master;
 import alluxio.master.file.contexts.CheckAccessContext;
 import alluxio.master.file.contexts.CheckConsistencyContext;
+import alluxio.master.file.contexts.ExistsContext;
 import alluxio.master.file.contexts.CompleteFileContext;
 import alluxio.master.file.contexts.CreateDirectoryContext;
 import alluxio.master.file.contexts.CreateFileContext;
@@ -47,6 +49,8 @@ import alluxio.master.file.meta.PersistenceState;
 import alluxio.metrics.TimeSeries;
 import alluxio.security.authorization.AclEntry;
 import alluxio.underfs.UfsMode;
+import alluxio.wire.ClientInfo;
+import alluxio.wire.ClientIdentifier;
 import alluxio.wire.FileBlockInfo;
 import alluxio.wire.FileInfo;
 import alluxio.wire.FileSystemCommand;
@@ -192,6 +196,16 @@ public interface FileSystemMaster extends Master {
       throws FileDoesNotExistException, InvalidPathException, AccessControlException, IOException;
 
   /**
+   * Checks path exists.
+   *
+   * @param path path to check
+   * @param context the method context
+   * @return whether the path exists
+   */
+  boolean exists(AlluxioURI path, ExistsContext context)
+      throws AccessControlException, IOException;
+
+  /**
    * Checks the consistency of the files and directories in the subtree under the path.
    *
    * @param path the root of the subtree to check
@@ -261,6 +275,12 @@ public interface FileSystemMaster extends Master {
    * @return a snapshot of the mount table as a mapping of Alluxio path to {@link MountPointInfo}
    */
   Map<String, MountPointInfo> getMountPointInfoSummary();
+
+  /**
+   * @param invokeUfs if true, invoke ufs to set ufs properties
+   * @return a snapshot of the mount table as a mapping of Alluxio path to {@link MountPointInfo}
+   */
+  Map<String, MountPointInfo> getMountPointInfoSummary(boolean invokeUfs);
 
   /**
    * Gets the mount point information of an Alluxio path for display purpose.
@@ -620,4 +640,40 @@ public interface FileSystemMaster extends Master {
    *                but no effect to other workers already excluded.
    */
   void decommissionWorkers(final Set<String> excludedWorkerSet, boolean addOnly);
+
+  /**
+   * Transports the information of the client and get journal id from master.
+   * @param clientId the client id
+   * @param metadataCacheSize the metadata cache size of client
+   * @return the journal id of master
+   */
+  long commandHeartbeat(long clientId, long metadataCacheSize);
+
+  /**
+   * Register client to master.
+   * @param clientId  the id of the client
+   * @param startTime the start time of client
+   *
+   */
+  void clientRegister(long clientId, long startTime)
+      throws NotFoundException;
+
+  /**
+   * Gets client id.
+   * @param clientIdentifier the client net address information
+   * @return the client id
+   */
+  long getClientId(ClientIdentifier clientIdentifier);
+
+  /**
+   * Gets normal client information.
+   * @return the normal client information
+   */
+  List<ClientInfo> getNormalClientInfoList();
+
+  /**
+   * Gets lost client information.
+   * @return the lost client information
+   */
+  List<ClientInfo> getLostClientInfoList();
 }

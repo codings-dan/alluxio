@@ -12,6 +12,7 @@
 package alluxio.master.file.uritranslator;
 
 import alluxio.AlluxioURI;
+import alluxio.exception.InvalidPathException;
 import alluxio.master.file.FileSystemMaster;
 import alluxio.master.file.meta.InodeTree;
 import alluxio.master.file.meta.MountTable;
@@ -21,11 +22,19 @@ import alluxio.master.file.meta.MountTable;
  */
 public class DefaultUriTranslator implements UriTranslator {
 
+  protected FileSystemMaster mMaster;
+  protected MountTable mMountTable;
+  protected InodeTree mInodeTree;
+
   public DefaultUriTranslator(FileSystemMaster master,
       MountTable mountTable, InodeTree inodeTree) {
+    mMaster = master;
+    mMountTable = mountTable;
+    mInodeTree = inodeTree;
   }
 
-  public AlluxioURI translateUri(String uriStr) {
+  @Override
+  public AlluxioURI translateUri(String uriStr) throws InvalidPathException {
     return new AlluxioURI(uriStr);
   }
 }

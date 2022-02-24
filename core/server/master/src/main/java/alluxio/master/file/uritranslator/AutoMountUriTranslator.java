@@ -14,8 +14,8 @@ package alluxio.master.file.uritranslator;
 import alluxio.AlluxioURI;
 import alluxio.Constants;
 import alluxio.annotation.SuppressFBWarnings;
-import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AccessControlException;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.InvalidPathException;
@@ -53,6 +53,7 @@ public class AutoMountUriTranslator implements UriTranslator {
     mInodeTree = inodeTree;
   }
 
+  @Override
   public AlluxioURI translateUri(String uriStr) throws InvalidPathException {
     AlluxioURI uri = new AlluxioURI(uriStr);
     // Scheme-less URIs are regarded as Alluxio URI.
@@ -77,7 +78,7 @@ public class AutoMountUriTranslator implements UriTranslator {
     }
 
     // Resolve unsuccessful
-    if (!ServerConfiguration.getBoolean(PropertyKey.MASTER_SHIMFS_AUTO_MOUNT_ENABLED)) {
+    if (!ServerConfiguration.getBoolean(TxPropertyKey.MASTER_SHIMFS_AUTO_MOUNT_ENABLED)) {
       throw new InvalidPathException(
           String.format("Could not reverse resolve ufs path: %s", uriStr));
     }
@@ -114,13 +115,13 @@ public class AutoMountUriTranslator implements UriTranslator {
     // The highest mount root will be URIs "scheme/authority" under the configured auto-mount root.
     // This allows same authorities under different schemes to be auto-mounted correctly.
     String alluxioMountRoot =
-        PathUtils.concatPath(ServerConfiguration.get(PropertyKey.MASTER_SHIMFS_AUTO_MOUNT_ROOT),
+        PathUtils.concatPath(ServerConfiguration.get(TxPropertyKey.MASTER_SHIMFS_AUTO_MOUNT_ROOT),
             ufsUri.getScheme(), ufsUri.getAuthority());
     // Read default options for auto-mounted UFSes.
     boolean mountReadonly =
-        ServerConfiguration.getBoolean(PropertyKey.MASTER_SHIMFS_AUTO_MOUNT_READONLY);
+        ServerConfiguration.getBoolean(TxPropertyKey.MASTER_SHIMFS_AUTO_MOUNT_READONLY);
     boolean mountShared =
-        ServerConfiguration.getBoolean(PropertyKey.MASTER_SHIMFS_AUTO_MOUNT_SHARED);
+        ServerConfiguration.getBoolean(TxPropertyKey.MASTER_SHIMFS_AUTO_MOUNT_SHARED);
     // Try mounting UFS to Alluxio starting from the ufs root.
     int pathComponentIndex = 0;
     String currentPathComponent;

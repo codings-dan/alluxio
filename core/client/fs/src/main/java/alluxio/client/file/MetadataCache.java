@@ -78,10 +78,22 @@ public final class MetadataCache {
    * @param expirationTimeMs the expiration time (in milliseconds) of the cached item
    */
   public MetadataCache(int maxSize, long expirationTimeMs) {
-    mCache = CacheBuilder.newBuilder()
-        .maximumSize(maxSize)
-        .expireAfterWrite(expirationTimeMs, TimeUnit.MILLISECONDS)
-        .build();
+    this(maxSize, expirationTimeMs, false);
+  }
+
+  /**
+   * @param maxSize the max size of the cache
+   * @param expirationTimeMs the expiration time (in milliseconds) of the cached item
+   * @param commandHeartbeatEnable whether to enable commandHeartbeat
+   */
+  public MetadataCache(int maxSize, long expirationTimeMs, boolean commandHeartbeatEnable) {
+    CacheBuilder<Object, Object> builder = CacheBuilder.newBuilder().maximumSize(maxSize);
+    if (commandHeartbeatEnable) {
+      builder.expireAfterAccess(expirationTimeMs, TimeUnit.MILLISECONDS);
+    } else {
+      builder.expireAfterWrite(expirationTimeMs, TimeUnit.MILLISECONDS);
+    }
+    mCache = builder.build();
   }
 
   /**
@@ -163,6 +175,13 @@ public final class MetadataCache {
    */
   public void invalidateAll() {
     mCache.invalidateAll();
+  }
+
+  /**
+   * Access all caches, update expiration time.
+   */
+  public void getAll() {
+    mCache.getAllPresent(mCache.asMap().keySet());
   }
 
   /**

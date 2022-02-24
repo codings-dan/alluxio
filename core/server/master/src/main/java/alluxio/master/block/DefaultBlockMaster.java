@@ -24,6 +24,7 @@ import alluxio.collections.IndexDefinition;
 import alluxio.collections.IndexedSet;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.BlockInfoException;
 import alluxio.exception.ExceptionMessage;
 import alluxio.exception.status.InvalidArgumentException;
@@ -56,6 +57,7 @@ import alluxio.metrics.Metric;
 import alluxio.metrics.MetricInfo;
 import alluxio.metrics.MetricKey;
 import alluxio.metrics.MetricsSystem;
+import alluxio.metrics.TxMetricKey;
 import alluxio.proto.journal.Block.BlockContainerIdGeneratorEntry;
 import alluxio.proto.journal.Block.BlockInfoEntry;
 import alluxio.proto.journal.Block.DeleteBlockEntry;
@@ -83,7 +85,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterators;
 import com.google.common.util.concurrent.Striped;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -311,6 +312,11 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
 
     MetricsSystem.registerGaugeIfAbsent(MetricKey.MASTER_LOST_BLOCK_COUNT.getName(),
         this::getLostBlocksCount);
+    if (ServerConfiguration.global().getBoolean(
+        TxPropertyKey.MASTER_COUNT_TO_REMOVE_BLOCKS_ENABLE)) {
+      MetricsSystem.registerGaugeIfAbsent(TxMetricKey.MASTER_TO_REMOVE_BLOCK_COUNT.getName(),
+          this::getToRemoveBlockCount);
+    }
   }
 
   /**
@@ -387,11 +393,11 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
 
   @Override
   public CloseableIterator<JournalEntry> getJournalEntryIterator() {
-    Iterator<Block> it = mBlockStore.iterator();
+    Iterator<Block> blockStoreIterator = mBlockStore.iterator();
     Iterator<JournalEntry> blockIterator = new Iterator<JournalEntry>() {
       @Override
       public boolean hasNext() {
-        return it.hasNext();
+        return blockStoreIterator.hasNext();
       }
 
       @Override
@@ -399,7 +405,7 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
         if (!hasNext()) {
           throw new NoSuchElementException();
         }
-        Block block = it.next();
+        Block block = blockStoreIterator.next();
         BlockInfoEntry blockInfoEntry =
             BlockInfoEntry.newBuilder().setBlockId(block.getId())
                 .setLength(block.getMeta().getLength()).build();
@@ -412,8 +418,20 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
       }
     };
 
-    return CloseableIterator.noopCloseable(Iterators
-        .concat(CommonUtils.singleElementIterator(getContainerIdJournalEntry()), blockIterator));
+    CloseableIterator<JournalEntry> closeableIterator =
+        CloseableIterator.create(blockIterator, (whatever) -> {
+          if (blockStoreIterator instanceof CloseableIterator) {
+            final CloseableIterator<Block> c = (CloseableIterator<Block>) blockStoreIterator;
+            c.close();
+          } else {
+            // no op
+          }
+        });
+
+    return CloseableIterator.concat(
+        CloseableIterator.noopCloseable(
+            CommonUtils.singleElementIterator(getContainerIdJournalEntry())),
+        closeableIterator);
   }
 
   /**
@@ -627,7 +645,8 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
         throw new InvalidArgumentException("Unrecognized worker range: " + workerRange);
     }
 
-    List<WorkerInfo> workerInfoList = new ArrayList<>();
+    List<WorkerInfo> workerInfoList = new ArrayList<>(
+        selectedLiveWorkers.size() + selectedLostWorkers.size());
     for (MasterWorkerInfo worker : selectedLiveWorkers) {
       // extractWorkerInfo handles the locking internally
       workerInfoList.add(extractWorkerInfo(worker, options.getFieldRange(), true));
@@ -672,14 +691,15 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
   public void removeBlocks(List<Long> blockIds, boolean delete) throws UnavailableException {
     try (JournalContext journalContext = createJournalContext()) {
       for (long blockId : blockIds) {
-        HashSet<Long> workerIds = new HashSet<>();
-
+        Set<Long> workerIds;
         try (LockResource r = lockBlock(blockId)) {
           Optional<BlockMeta> block = mBlockStore.getBlock(blockId);
           if (!block.isPresent()) {
             continue;
           }
-          for (BlockLocation loc : mBlockStore.getLocations(blockId)) {
+          List<BlockLocation> locations = mBlockStore.getLocations(blockId);
+          workerIds = new HashSet<>(locations.size());
+          for (BlockLocation loc : locations) {
             workerIds.add(loc.getWorkerId());
           }
           // Two cases here:
@@ -1042,7 +1062,8 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
     }
 
     // Gather all blocks on this worker.
-    HashSet<Long> blocks = new HashSet<>();
+    int totalSize = currentBlocksOnLocation.values().stream().mapToInt(List::size).sum();
+    HashSet<Long> blocks = new HashSet<>(totalSize);
     for (List<Long> blockIds : currentBlocksOnLocation.values()) {
       blocks.addAll(blockIds);
     }
@@ -1371,6 +1392,10 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
   @Override
   public int getLostBlocksCount() {
     return mLostBlocks.size();
+  }
+
+  private int getToRemoveBlockCount() {
+    return mWorkers.stream().map(MasterWorkerInfo::getToRemoveBlockCount).reduce(0, Integer::sum);
   }
 
   /**

@@ -17,8 +17,8 @@ import alluxio.ClientContext;
 import alluxio.client.file.FileSystem;
 import alluxio.client.file.FileSystemContext;
 import alluxio.client.file.URIStatus;
-import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.InvalidPathException;
 import alluxio.exception.status.InternalException;
 import alluxio.grpc.CreateDirectoryPOptions;
@@ -27,6 +27,7 @@ import alluxio.grpc.DeletePOptions;
 import alluxio.grpc.ListStatusPOptions;
 import alluxio.grpc.SetAttributePOptions;
 import alluxio.grpc.WritePType;
+import alluxio.master.file.uritranslator.AutoMountUriTranslator;
 import alluxio.testutils.LocalAlluxioClusterResource;
 import alluxio.uri.Authority;
 import alluxio.util.io.FileUtils;
@@ -48,7 +49,10 @@ public class ShimFileSystemIntegrationTest {
 
   @Rule
   public LocalAlluxioClusterResource mLocalAlluxioClusterResource =
-      new LocalAlluxioClusterResource.Builder().build();
+      new LocalAlluxioClusterResource.Builder()
+          .setProperty(TxPropertyKey.MASTER_URI_TRANSLATOR_IMPL,
+              AutoMountUriTranslator.class.getName())
+          .build();
 
   @Rule
   public ExpectedException mThrown = ExpectedException.none();
@@ -235,8 +239,8 @@ public class ShimFileSystemIntegrationTest {
 
   @Test
   @LocalAlluxioClusterResource.Config(confParams = {
-      PropertyKey.Name.MASTER_SHIMFS_AUTO_MOUNT_ENABLED, "true",
-      PropertyKey.Name.MASTER_SHIMFS_AUTO_MOUNT_READONLY, "false"})
+      TxPropertyKey.Name.MASTER_SHIMFS_AUTO_MOUNT_ENABLED, "true",
+      TxPropertyKey.Name.MASTER_SHIMFS_AUTO_MOUNT_READONLY, "false"})
   public void autoMountCreateFile() throws Exception {
     // Un-mounted foreign root.
     String foreignRoot = new AlluxioURI("file", Authority.fromString(null),
@@ -258,7 +262,7 @@ public class ShimFileSystemIntegrationTest {
 
   @Test
   @LocalAlluxioClusterResource.Config(
-      confParams = {PropertyKey.Name.MASTER_SHIMFS_AUTO_MOUNT_ENABLED, "true"})
+      confParams = {TxPropertyKey.Name.MASTER_SHIMFS_AUTO_MOUNT_ENABLED, "true"})
   public void autoMountGetFile() throws Exception {
     // Un-mounted foreign root.
     String foreignRoot = new AlluxioURI("file", Authority.fromString(null),

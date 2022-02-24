@@ -14,6 +14,7 @@ package alluxio.security.group;
 import alluxio.annotation.PublicApi;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.PropertyKey;
+import alluxio.security.group.provider.LdapGroupsMapping;
 import alluxio.util.CommonUtils;
 
 import org.slf4j.Logger;
@@ -56,9 +57,15 @@ public interface GroupMappingService {
         synchronized (Factory.class) {
           if (sCachedGroupMapping == null) {
             LOG.debug("Creating new Groups object");
-            GroupMappingService groupMappingService =
-                CommonUtils.createNewClassInstance(conf.<GroupMappingService>getClass(
-                    PropertyKey.SECURITY_GROUP_MAPPING_CLASS), null, null);
+            GroupMappingService groupMappingService;
+            Class<GroupMappingService> cls =
+                conf.getClass(PropertyKey.SECURITY_GROUP_MAPPING_CLASS);
+            // TODO(baoloongmao): Use reflection to create new class instance for ldap too.
+            if (cls.equals(LdapGroupsMapping.class)) {
+              groupMappingService = new LdapGroupsMapping(conf);
+            } else {
+              groupMappingService = CommonUtils.createNewClassInstance(cls, null, null);
+            }
             sCachedGroupMapping = new CachedGroupMapping(groupMappingService,
                 conf.getMs(PropertyKey.SECURITY_GROUP_MAPPING_CACHE_TIMEOUT_MS));
           }

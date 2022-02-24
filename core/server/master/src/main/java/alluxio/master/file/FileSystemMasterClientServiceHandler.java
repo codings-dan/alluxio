@@ -16,11 +16,17 @@ import alluxio.RpcUtils;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
 import alluxio.exception.InvalidPathException;
+import alluxio.exception.status.NotFoundException;
 import alluxio.grpc.CheckAccessPRequest;
 import alluxio.grpc.CheckAccessPResponse;
 import alluxio.grpc.CheckConsistencyPOptions;
 import alluxio.grpc.CheckConsistencyPRequest;
 import alluxio.grpc.CheckConsistencyPResponse;
+import alluxio.grpc.ClientRegisterPRequest;
+import alluxio.grpc.ClientRegisterPResponse;
+import alluxio.grpc.CommandHeartbeatPOptions;
+import alluxio.grpc.CommandHeartbeatPRequest;
+import alluxio.grpc.CommandHeartbeatPResponse;
 import alluxio.grpc.CompleteFilePRequest;
 import alluxio.grpc.CompleteFilePResponse;
 import alluxio.grpc.CreateDirectoryPOptions;
@@ -32,9 +38,13 @@ import alluxio.grpc.DecommissionWorkersPOptions;
 import alluxio.grpc.DecommissionWorkersPResponse;
 import alluxio.grpc.DeletePRequest;
 import alluxio.grpc.DeletePResponse;
+import alluxio.grpc.ExistsPRequest;
+import alluxio.grpc.ExistsPResponse;
 import alluxio.grpc.FileSystemMasterClientServiceGrpc;
 import alluxio.grpc.FreePRequest;
 import alluxio.grpc.FreePResponse;
+import alluxio.grpc.GetClientIdPRequest;
+import alluxio.grpc.GetClientIdPResponse;
 import alluxio.grpc.GetFilePathPRequest;
 import alluxio.grpc.GetFilePathPResponse;
 import alluxio.grpc.GetMountTablePRequest;
@@ -75,6 +85,7 @@ import alluxio.grpc.UpdateUfsModePRequest;
 import alluxio.grpc.UpdateUfsModePResponse;
 import alluxio.master.file.contexts.CheckAccessContext;
 import alluxio.master.file.contexts.CheckConsistencyContext;
+import alluxio.master.file.contexts.ExistsContext;
 import alluxio.master.file.contexts.CompleteFileContext;
 import alluxio.master.file.contexts.CreateDirectoryContext;
 import alluxio.master.file.contexts.CreateFileContext;
@@ -89,6 +100,7 @@ import alluxio.master.file.contexts.ScheduleAsyncPersistenceContext;
 import alluxio.master.file.contexts.SetAclContext;
 import alluxio.master.file.contexts.SetAttributeContext;
 import alluxio.underfs.UfsMode;
+import alluxio.wire.ClientIdentifier;
 import alluxio.wire.MountPointInfo;
 import alluxio.wire.SyncPointInfo;
 
@@ -149,6 +161,17 @@ public final class FileSystemMasterClientServiceHandler
       }
       return CheckConsistencyPResponse.newBuilder().addAllInconsistentPaths(uris).build();
     }, "CheckConsistency", "request=%s", responseObserver, request);
+  }
+
+  @Override
+  public void exists(ExistsPRequest request,
+          StreamObserver<ExistsPResponse> responseObserver) {
+    RpcUtils.call(LOG, () -> {
+      AlluxioURI pathUri = getAlluxioURI(request.getPath());
+      boolean exists = mFileSystemMaster.exists(pathUri,
+          ExistsContext.create(request.getOptions().toBuilder()));
+      return ExistsPResponse.newBuilder().setExists(exists).build();
+    }, "CheckExistence", "request=%s", responseObserver, request);
   }
 
   @Override
@@ -219,7 +242,6 @@ public final class FileSystemMasterClientServiceHandler
   @Override
   public void getStatus(GetStatusPRequest request,
       StreamObserver<GetStatusPResponse> responseObserver) {
-    String path = request.getPath();
     GetStatusPOptions options = request.getOptions();
     RpcUtils.call(LOG, () -> {
       AlluxioURI pathUri = getAlluxioURI(request.getPath());
@@ -435,6 +457,44 @@ public final class FileSystemMasterClientServiceHandler
       mFileSystemMaster.decommissionWorkers(excludedWorkerSet, addOnly);
       return DecommissionWorkersPResponse.newBuilder().build();
     }, "decommissionWorkers", "request=%s", responseObserver, request);
+  }
+
+  @Override
+  public void commandHeartbeat(CommandHeartbeatPRequest request,
+      StreamObserver<alluxio.grpc.CommandHeartbeatPResponse> responseObserver) {
+    long clientId = request.getClientId();
+    long metadataCacheSize = request.getMetadataCacheSize();
+    long journalId = mFileSystemMaster.commandHeartbeat(clientId, metadataCacheSize);
+    RpcUtils.call(LOG, () -> {
+      return CommandHeartbeatPResponse.newBuilder().setOptions(
+          CommandHeartbeatPOptions.newBuilder().setJournalId(journalId).build()).build();
+    }, "commandHeartbeat", "request=%s", responseObserver, request);
+  }
+
+  @Override
+  public void getClientId(GetClientIdPRequest request,
+      StreamObserver<alluxio.grpc.GetClientIdPResponse> responseObserver) {
+    ClientIdentifier clientIdentifier = GrpcUtils.fromProto(request.getClientIdentifier());
+    long clientId = mFileSystemMaster.getClientId(clientIdentifier);
+    RpcUtils.call(LOG, () -> {
+      return GetClientIdPResponse.newBuilder().setClientId(clientId).build();
+    }, "getClientId", "request=%s", responseObserver, request);
+  }
+
+  @Override
+  public void clientRegister(ClientRegisterPRequest request,
+      StreamObserver<alluxio.grpc.ClientRegisterPResponse> responseObserver) {
+    long clientId = request.getClientId();
+    long startTime = request.getStartTime();
+    try {
+      mFileSystemMaster.clientRegister(clientId, startTime);
+    } catch (NotFoundException e) {
+      LOG.info("Can't find the client {} to register", clientId);
+    }
+
+    RpcUtils.call(LOG, () -> {
+      return ClientRegisterPResponse.newBuilder().build(); },
+        "clientRegister", "request=%s", responseObserver, request);
   }
 
   /**

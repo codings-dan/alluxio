@@ -20,6 +20,7 @@ import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.InstancedConfiguration;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.Source;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.DirectoryNotEmptyException;
 import alluxio.exception.FileAlreadyExistsException;
@@ -108,6 +109,12 @@ public interface FileSystem extends Closeable {
       return get(subject, new InstancedConfiguration(ConfigurationUtils.defaults()));
     }
 
+    /**
+     * Get a FileSystem from the cache with a given subject.
+     * @param subject The subject to use for security-related client operations
+     * @param conf the Alluxio configuration
+     * @return a FileSystem from the cache, creating a new one if it doesn't yet exist
+     */
     public static FileSystem get(Subject subject, AlluxioConfiguration conf) {
       Preconditions.checkNotNull(subject, "subject");
       // TODO(gpang): should this key use the UserState instead of subject?
@@ -148,8 +155,14 @@ public interface FileSystem extends Closeable {
           LOG.debug("{}={} ({})", key.getName(), value, source);
         }
       }
+      boolean commandHeartbeatEnabled =
+          context.getClusterConf().getBoolean(TxPropertyKey.USER_COMMAND_HEARTBEAT_ENABLED);
       FileSystem fs = conf.getBoolean(PropertyKey.USER_METADATA_CACHE_ENABLED)
           ? new MetadataCachingBaseFileSystem(context) : new BaseFileSystem(context);
+      if (commandHeartbeatEnabled) {
+        CommandHeartbeatContext.addHeartbeat(context.getClientContext(),
+            context.getMasterClientContext().getMasterInquireClient(), fs);
+      }
       // Enable local cache only for clients which have the property set.
       if (conf.getBoolean(PropertyKey.USER_CLIENT_CACHE_ENABLED)
           && CommonUtils.PROCESS_TYPE.get().equals(CommonUtils.ProcessType.CLIENT)) {

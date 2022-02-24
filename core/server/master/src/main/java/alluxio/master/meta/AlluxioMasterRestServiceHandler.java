@@ -52,6 +52,7 @@ import alluxio.util.LogUtils;
 import alluxio.util.SecurityUtils;
 import alluxio.util.io.PathUtils;
 import alluxio.util.network.NetworkAddressUtils;
+import alluxio.util.webui.ClientNodeInfo;
 import alluxio.util.webui.NodeInfo;
 import alluxio.util.webui.StorageTierInfo;
 import alluxio.util.webui.UIFileBlockInfo;
@@ -61,10 +62,12 @@ import alluxio.web.MasterWebServer;
 import alluxio.wire.AlluxioMasterInfo;
 import alluxio.wire.BlockLocation;
 import alluxio.wire.Capacity;
+import alluxio.wire.ClientInfo;
 import alluxio.wire.ConfigCheckReport;
 import alluxio.wire.FileBlockInfo;
 import alluxio.wire.FileInfo;
 import alluxio.wire.MasterWebUIBrowse;
+import alluxio.wire.MasterWebUIClients;
 import alluxio.wire.MasterWebUIConfiguration;
 import alluxio.wire.MasterWebUIData;
 import alluxio.wire.MasterWebUIInit;
@@ -87,6 +90,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.lang3.tuple.ImmutableTriple;
 import org.apache.commons.lang3.tuple.Triple;
+import org.apache.ratis.proto.RaftProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -147,6 +151,7 @@ public final class AlluxioMasterRestServiceHandler {
   public static final String WEBUI_WORKERS = "webui_workers";
   public static final String WEBUI_METRICS = "webui_metrics";
   public static final String WEBUI_MOUNTTABLE = "webui_mounttable";
+  public static final String WEBUI_CLIENTS = "webui_clients";
 
   // queries
   public static final String QUERY_RAW_CONFIGURATION = "raw_configuration";
@@ -353,6 +358,17 @@ public final class AlluxioMasterRestServiceHandler {
         }
       }
 
+      Gauge masterRoleIdGauge = MetricsSystem.METRIC_REGISTRY.getGauges()
+          .get(MetricKey.MASTER_ROLE_ID.getName());
+      Gauge leaderIdGauge = MetricsSystem.METRIC_REGISTRY.getGauges()
+          .get(MetricKey.CLUSTER_LEADER_ID.getName());
+      if (masterRoleIdGauge != null) {
+        response.setMasterRole(RaftProtos.RaftPeerRole.forNumber(
+            (Integer) masterRoleIdGauge.getValue()).name());
+      }
+      if (leaderIdGauge != null) {
+        response.setLeaderId((String) leaderIdGauge.getValue());
+      }
       return response;
     }, ServerConfiguration.global());
   }
@@ -866,7 +882,7 @@ public final class AlluxioMasterRestServiceHandler {
   boolean isMounted(String ufs) {
     ufs = PathUtils.normalizePath(ufs, AlluxioURI.SEPARATOR);
     for (Map.Entry<String, MountPointInfo> entry :
-        mFileSystemMaster.getMountPointInfoSummary().entrySet()) {
+        mFileSystemMaster.getMountPointInfoSummary(false).entrySet()) {
       String escaped = MetricsSystem.escape(new AlluxioURI(entry.getValue().getUfsUri()));
       escaped = PathUtils.normalizePath(escaped, AlluxioURI.SEPARATOR);
       if (escaped.equals(ufs)) {
@@ -1104,6 +1120,24 @@ public final class AlluxioMasterRestServiceHandler {
         }
         response.setJournalLastCheckpointTime(time);
       }
+
+      return response;
+    }, ServerConfiguration.global());
+  }
+
+  @GET
+  @Path(WEBUI_CLIENTS)
+  public Response getWebUIClients() {
+    return RestUtils.call(() -> {
+      MasterWebUIClients response = new MasterWebUIClients();
+
+      List<ClientInfo> clientInfos = mFileSystemMaster.getNormalClientInfoList();
+      ClientNodeInfo[] clientNodeInfos = WebUtils.generateOrderedClientInfos(clientInfos);
+      response.setNormalClientNodeInfos(clientNodeInfos);
+
+      List<ClientInfo> lostClientInfos = mFileSystemMaster.getLostClientInfoList();
+      ClientNodeInfo[] failedClientNodeInfos = WebUtils.generateOrderedClientInfos(lostClientInfos);
+      response.setFailedClientNodeInfos(failedClientNodeInfos);
 
       return response;
     }, ServerConfiguration.global());

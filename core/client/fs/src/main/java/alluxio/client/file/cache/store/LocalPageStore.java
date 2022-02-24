@@ -29,6 +29,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -43,7 +44,7 @@ import javax.annotation.concurrent.NotThreadSafe;
 public class LocalPageStore implements PageStore {
   private static final Logger LOG = LoggerFactory.getLogger(LocalPageStore.class);
   private static final String ERROR_NO_SPACE_LEFT = "No space left on device";
-  private final String[] mRoots;
+  private final List<Path> mRoots;
   private final long mPageSize;
   private final long mCapacity;
   private final int mFileBuckets;
@@ -55,14 +56,16 @@ public class LocalPageStore implements PageStore {
    * @param options options for the local page store
    */
   public LocalPageStore(LocalPageStoreOptions options) {
-    mRoots = options.getRootDir().split(",");
+    mRoots = options.getRootDirs();
     mPageSize = options.getPageSize();
     mCapacity = (long) (options.getCacheSize() / (1 + options.getOverheadRatio()));
     mFileBuckets = options.getFileBuckets();
     // pattern encoding root_path/page_size(ulong)/bucket(uint)/file_id(str)/page_idx(ulong)
     mPagePattern = Pattern.compile(
         String.format("%s/%d/(\\d+)/([^/]+)/(\\d+)", "("
-            + options.getRootDir().replace(",", "|") + ")", mPageSize));
+                + mRoots.stream().map(path -> path.toString()).reduce((a, b) -> a + "|" + b).get()
+                + ")",
+            mPageSize));
   }
 
   @Override
@@ -158,15 +161,16 @@ public class LocalPageStore implements PageStore {
   @VisibleForTesting
   public Path getFilePath(PageId pageId) {
     // TODO(feng): encode fileId with URLEncoder to escape invalid characters for file name
-    return Paths.get(getRoot(pageId), Long.toString(mPageSize), getFileBucket(pageId.getFileId()),
-        pageId.getFileId(), Long.toString(pageId.getPageIndex()));
+    return Paths.get(getRoot(pageId).toString(), Long.toString(mPageSize),
+        getFileBucket(pageId.getFileId()), pageId.getFileId(),
+        Long.toString(pageId.getPageIndex()));
   }
 
-  private String getRoot(PageId pageId) {
+  private Path getRoot(PageId pageId) {
     // TODO(maobaolong): Refactor to support choose volume policy
-    int index = pageId.hashCode() % mRoots.length;
-    index = index < 0 ? index + mRoots.length : index;
-    return mRoots[index];
+    int index = pageId.hashCode() % mRoots.size();
+    index = index < 0 ? index + mRoots.size() : index;
+    return mRoots.get(index);
   }
 
   private String getFileBucket(String fileId) {
@@ -226,8 +230,8 @@ public class LocalPageStore implements PageStore {
   @Override
   public Stream<PageInfo> getPages() throws IOException {
     Stream<Path> stream = Stream.empty();
-    for (String root : mRoots) {
-      stream = Stream.concat(stream, Files.walk(Paths.get(root)));
+    for (Path root : mRoots) {
+      stream = Stream.concat(stream, Files.walk(root));
     }
     return stream.filter(Files::isRegularFile).map(this::getPageInfo);
   }

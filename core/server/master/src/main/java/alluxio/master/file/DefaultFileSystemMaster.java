@@ -13,6 +13,7 @@ package alluxio.master.file;
 
 import static alluxio.master.file.InodeSyncStream.SyncStatus.FAILED;
 import static alluxio.master.file.InodeSyncStream.SyncStatus.NOT_NEEDED;
+import static alluxio.master.file.InodeSyncStream.SyncStatus.OK;
 import static alluxio.metrics.MetricInfo.UFS_OP_SAVED_PREFIX;
 
 import alluxio.AlluxioURI;
@@ -22,12 +23,15 @@ import alluxio.Server;
 import alluxio.client.job.JobMasterClient;
 import alluxio.client.job.JobMasterClientPool;
 import alluxio.clock.SystemClock;
+import alluxio.collections.IndexDefinition;
+import alluxio.collections.IndexedSet;
 import alluxio.collections.Pair;
 import alluxio.collections.PrefixList;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.Reconfigurable;
 import alluxio.conf.ReconfigurableRegistry;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AccessControlException;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.BlockInfoException;
@@ -62,6 +66,7 @@ import alluxio.grpc.SetAclAction;
 import alluxio.grpc.SetAttributePOptions;
 import alluxio.grpc.TtlAction;
 import alluxio.heartbeat.HeartbeatContext;
+import alluxio.heartbeat.HeartbeatExecutor;
 import alluxio.heartbeat.HeartbeatThread;
 import alluxio.job.plan.persist.PersistConfig;
 import alluxio.job.wire.JobInfo;
@@ -76,6 +81,7 @@ import alluxio.master.file.activesync.ActiveSyncManager;
 import alluxio.master.file.contexts.CallTracker;
 import alluxio.master.file.contexts.CheckAccessContext;
 import alluxio.master.file.contexts.CheckConsistencyContext;
+import alluxio.master.file.contexts.ExistsContext;
 import alluxio.master.file.contexts.CompleteFileContext;
 import alluxio.master.file.contexts.CreateDirectoryContext;
 import alluxio.master.file.contexts.CreateFileContext;
@@ -126,6 +132,7 @@ import alluxio.metrics.MetricInfo;
 import alluxio.metrics.MetricKey;
 import alluxio.metrics.MetricsSystem;
 import alluxio.metrics.TimeSeries;
+import alluxio.metrics.TxMetricKey;
 import alluxio.proto.journal.File;
 import alluxio.proto.journal.File.NewBlockEntry;
 import alluxio.proto.journal.File.RenameEntry;
@@ -166,6 +173,8 @@ import alluxio.util.io.PathUtils;
 import alluxio.util.proto.ProtoUtils;
 import alluxio.wire.BlockInfo;
 import alluxio.wire.BlockLocation;
+import alluxio.wire.ClientInfo;
+import alluxio.wire.ClientIdentifier;
 import alluxio.wire.CommandType;
 import alluxio.wire.FileBlockInfo;
 import alluxio.wire.FileInfo;
@@ -188,6 +197,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Streams;
 import io.grpc.ServerInterceptors;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -196,6 +206,7 @@ import org.slf4j.LoggerFactory;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -224,13 +235,29 @@ import javax.annotation.concurrent.NotThreadSafe;
  * The master that handles all file system metadata management.
  */
 @NotThreadSafe // TODO(jiri): make thread-safe (c.f. ALLUXIO-1664)
-public final class DefaultFileSystemMaster extends CoreMaster
+public class DefaultFileSystemMaster extends CoreMaster
     implements FileSystemMaster, DelegatingJournaled, Reconfigurable {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultFileSystemMaster.class);
   private static final Set<Class<? extends Server>> DEPS = ImmutableSet.of(BlockMaster.class);
 
   /** The number of threads to use in the {@link #mPersistCheckerPool}. */
   private static final int PERSIST_CHECKER_POOL_THREADS = 128;
+
+  private static final IndexDefinition<ClientInfo, Long> ID_INDEX =
+      new IndexDefinition<ClientInfo, Long>(true) {
+        @Override
+        public Long getFieldValue(ClientInfo o) {
+          return o.getId();
+        }
+      };
+
+  private static final IndexDefinition<ClientInfo, ClientIdentifier> IDENTIFIER_INDEX =
+      new IndexDefinition<ClientInfo, ClientIdentifier>(true) {
+        @Override
+        public ClientIdentifier getFieldValue(ClientInfo o) {
+          return o.getClientIdentifier();
+        }
+      };
 
   /**
    * Locking in DefaultFileSystemMaster
@@ -386,6 +413,9 @@ public final class DefaultFileSystemMaster extends CoreMaster
   /** Thread pool which asynchronously handles the completion of persist jobs. */
   private java.util.concurrent.ThreadPoolExecutor mPersistCheckerPool;
 
+  /** The provider for authorization with external plugins. */
+  private InodeAttributesProvider mAuthProvider = null;
+
   private ActiveSyncManager mSyncManager;
 
   /** Log writer for user access audit log. */
@@ -420,6 +450,12 @@ public final class DefaultFileSystemMaster extends CoreMaster
       1, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
       ThreadFactoryUtils.build("alluxio-ufs-active-sync-%d", false));
   private HeartbeatThread mReplicationCheckHeartbeatThread;
+  private final IndexedSet<ClientInfo> mClients =
+      new IndexedSet<>(ID_INDEX, IDENTIFIER_INDEX);
+  private final IndexedSet<ClientInfo> mLostClients =
+      new IndexedSet<>(ID_INDEX, IDENTIFIER_INDEX);
+  private final IndexedSet<ClientInfo> mTempClients =
+      new IndexedSet<>(ID_INDEX, IDENTIFIER_INDEX);
 
   /**
    * Creates a new instance of {@link DefaultFileSystemMaster}.
@@ -471,8 +507,16 @@ public final class DefaultFileSystemMaster extends CoreMaster
         return Type.STATE_LOCK_TRACKER;
       }
     };
-    mPermissionChecker = PermissionChecker.Factory.create(
-        ServerConfiguration.global(), mInodeTree);
+    if (ServerConfiguration.getBoolean(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_ENABLED)) {
+      AbstractInodeAttributesProviderFactory authProviderFactory =
+          new AbstractInodeAttributesProviderFactory();
+      mUfsManager.registerUfsServiceFactory(InodeAttributesProvider.class, authProviderFactory);
+      mAuthProvider = new ExtensionInodeAttributesProvider(mMountTable, authProviderFactory);
+      mPermissionChecker = new ExtendablePermissionChecker(mInodeTree, mAuthProvider);
+      mUfsManager.addUfsServersForRootUfs();
+    } else {
+      mPermissionChecker = new DefaultPermissionChecker(mInodeTree);
+    }
     mJobMasterClientPool = new JobMasterClientPool(JobMasterClientContext
         .newBuilder(ClientContext.create(ServerConfiguration.global())).build());
     mPersistRequests = new ConcurrentHashMap<>();
@@ -505,6 +549,8 @@ public final class DefaultFileSystemMaster extends CoreMaster
     Metrics.registerGauges(mUfsManager, mInodeTree);
 
     mUriTranslator = UriTranslator.Factory.create(this, mMountTable, mInodeTree);
+    MetricsSystem.registerGaugeIfAbsent(TxMetricKey.CLUSTER_REGISTER_CLIENTS.getName(),
+        mClients::size);
   }
 
   private static MountInfo getRootMountInfo(MasterUfsManager ufsManager) {
@@ -691,6 +737,11 @@ public final class DefaultFileSystemMaster extends CoreMaster
               new TimeSeriesRecorder(),
               (int) ServerConfiguration.getMs(PropertyKey.MASTER_METRICS_TIME_SERIES_INTERVAL),
               ServerConfiguration.global(), mMasterContext.getUserState()));
+      getExecutorService().submit(new HeartbeatThread(
+          HeartbeatContext.MASTER_LOST_CLIENT_DETECTION,
+          new LostClientDetectionHeartbeatExecutor(),
+          (int) ServerConfiguration.getMs(TxPropertyKey.MASTER_LOST_CLIENT_DETECTION_INTERVAL),
+          ServerConfiguration.global(), mMasterContext.getUserState()));
       if (ServerConfiguration.getBoolean(PropertyKey.MASTER_AUDIT_LOGGING_ENABLED)) {
         mAsyncAuditLogWriter = new AsyncUserAccessAuditLogWriter("AUDIT_LOG");
         mAsyncAuditLogWriter.start();
@@ -705,6 +756,9 @@ public final class DefaultFileSystemMaster extends CoreMaster
                 (int) ServerConfiguration.getMs(PropertyKey.UNDERFS_CLEANUP_INTERVAL),
                 ServerConfiguration.global(), mMasterContext.getUserState()));
       }
+      if (mAuthProvider != null) {
+        mAuthProvider.start();
+      }
       mAccessTimeUpdater.start();
       mSyncManager.start();
     }
@@ -718,6 +772,10 @@ public final class DefaultFileSystemMaster extends CoreMaster
     }
     mSyncManager.stop();
     mAccessTimeUpdater.stop();
+
+    if (mAuthProvider != null) {
+      mAuthProvider.stop();
+    }
     super.stop();
   }
 
@@ -896,7 +954,7 @@ public final class DefaultFileSystemMaster extends CoreMaster
 
           FileInfo fileInfo = getFileInfoInternal(inodePath);
           if (!fileInfo.isFolder() && (!fileInfo.isCompleted())) {
-            LOG.warn("File {} is not yet completed. getStatus will see incomplete metadata.",
+            LOG.debug("File {} is not yet completed. getStatus will see incomplete metadata.",
                 fileInfo.getPath());
           }
           if (ufsAccessed) {
@@ -1278,13 +1336,13 @@ public final class DefaultFileSystemMaster extends CoreMaster
         FileSystemMasterAuditContext auditContext =
             createAuditContext("checkConsistency", path, null, null)) {
 
-      syncMetadata(rpcContext,
+      InodeSyncStream.SyncStatus syncStatus = syncMetadata(rpcContext,
           path,
           context.getOptions().getCommonOptions(),
           DescendantType.ALL,
           auditContext,
           LockedInodePath::getInodeOrNull,
-          (inodePath,  permChecker) -> permChecker.checkPermission(Mode.Bits.READ, inodePath),
+          (inodePath, permChecker) -> permChecker.checkPermission(Mode.Bits.READ, inodePath),
           false);
 
       LockingScheme lockingScheme =
@@ -1298,7 +1356,8 @@ public final class DefaultFileSystemMaster extends CoreMaster
           auditContext.setAllowed(false);
           throw e;
         }
-        checkConsistencyRecursive(parent, inconsistentUris, false);
+        checkConsistencyRecursive(parent, inconsistentUris, false,
+            syncStatus == OK);
 
         auditContext.setSucceeded(true);
       }
@@ -1306,8 +1365,44 @@ public final class DefaultFileSystemMaster extends CoreMaster
     return inconsistentUris;
   }
 
+  @Override
+  public boolean exists(AlluxioURI path, ExistsContext context)
+      throws AccessControlException, IOException {
+    try (RpcContext rpcContext = createRpcContext(context);
+         FileSystemMasterAuditContext auditContext =
+             createAuditContext("exists", path, null, null)) {
+      syncMetadata(
+          rpcContext, path, context.getOptions().getCommonOptions(),
+          DescendantType.ONE, auditContext, LockedInodePath::getInodeOrNull,
+          (inodePath, permChecker) -> permChecker.checkPermission(Mode.Bits.READ, inodePath),
+          false);
+
+      try (LockedInodePath inodePath = mInodeTree.lockInodePath(createLockingScheme(path,
+          context.getOptions().getCommonOptions(), LockPattern.READ))) {
+        LoadMetadataContext lmCtx = LoadMetadataContext.create(
+            LoadMetadataPOptions.newBuilder()
+                .setCommonOptions(context.getOptions().getCommonOptions())
+                .setLoadType(context.getOptions().getLoadMetadataType()));
+        if (shouldLoadMetadataIfNotExists(inodePath, lmCtx)) {
+          checkLoadMetadataOptions(context.getOptions().getLoadMetadataType(), path);
+          loadMetadataIfNotExist(rpcContext, path, lmCtx, false);
+        }
+      } catch (FileDoesNotExistException e) {
+        return false;
+      }
+
+      try (LockedInodePath inodePath = mInodeTree.lockInodePath(createLockingScheme(path,
+          context.getOptions().getCommonOptions(), LockPattern.READ))) {
+        auditContext.setSucceeded(true);
+        return inodePath.fullPathExists();
+      }
+    } catch (InvalidPathException e) {
+      return false;
+    }
+  }
+
   private void checkConsistencyRecursive(LockedInodePath inodePath,
-      List<AlluxioURI> inconsistentUris, boolean assertInconsistent)
+      List<AlluxioURI> inconsistentUris, boolean assertInconsistent, boolean metadataSynced)
           throws IOException, FileDoesNotExistException {
     Inode inode = inodePath.getInode();
     try {
@@ -1320,10 +1415,36 @@ public final class DefaultFileSystemMaster extends CoreMaster
       }
       if (inode.isDirectory()) {
         InodeDirectory inodeDir = inode.asDirectory();
-        for (Inode child : mInodeStore.getChildren(inodeDir)) {
+        Iterable<? extends Inode> children = mInodeStore.getChildren(inodeDir);
+        for (Inode child : children) {
           try (LockedInodePath childPath = inodePath.lockChild(child, LockPattern.READ)) {
-            checkConsistencyRecursive(childPath, inconsistentUris, assertInconsistent);
+            checkConsistencyRecursive(childPath, inconsistentUris, assertInconsistent,
+                metadataSynced);
           }
+        }
+        // If a file exists in ufs but not in alluxio,
+        // it should be treated as an inconsistent file.
+        // if it is a directory we could ignore the subpaths.
+        // if the metadata has already been synced, then we could skip it.
+        if (metadataSynced) {
+          return;
+        }
+        MountTable.Resolution resolution = mMountTable.resolve(inodePath.getUri());
+        UfsStatus[] statuses;
+        try (CloseableResource<UnderFileSystem> ufsResource = resolution.acquireUfsResource()) {
+          UnderFileSystem ufs = ufsResource.get();
+          String ufsPath = resolution.getUri().getPath();
+          statuses = ufs.listStatus(ufsPath);
+        }
+        if (statuses != null) {
+          HashSet<String> alluxioFileNames = Streams.stream(children)
+              .map(Inode::getName)
+              .collect(Collectors.toCollection(HashSet::new));
+          Arrays.stream(statuses).forEach(status -> {
+            if (!alluxioFileNames.contains(status.getName())) {
+              inconsistentUris.add(inodePath.getUri().join(status.getName()));
+            }
+          });
         }
       }
     } catch (InvalidPathException e) {
@@ -1495,7 +1616,8 @@ public final class DefaultFileSystemMaster extends CoreMaster
 
     InodeFile inode = inodePath.getInodeFile();
     if (inode.isCompleted() && inode.getLength() != Constants.UNKNOWN_SIZE) {
-      throw new FileAlreadyCompletedException("File " + getName() + " has already been completed.");
+      throw new FileAlreadyCompletedException(String
+          .format("File %s has already been completed.", inode.getName()));
     }
     if (length < 0 && length != Constants.UNKNOWN_SIZE) {
       throw new InvalidFileSizeException(
@@ -1690,9 +1812,15 @@ public final class DefaultFileSystemMaster extends CoreMaster
 
   @Override
   public Map<String, MountPointInfo> getMountPointInfoSummary() {
+    return getMountPointInfoSummary(true);
+  }
+
+  @Override
+  public Map<String, MountPointInfo> getMountPointInfoSummary(boolean invokeUfs) {
     SortedMap<String, MountPointInfo> mountPoints = new TreeMap<>();
     for (Map.Entry<String, MountInfo> mountPoint : mMountTable.getMountTable().entrySet()) {
-      mountPoints.put(mountPoint.getKey(), getDisplayMountPointInfo(mountPoint.getValue()));
+      mountPoints.put(mountPoint.getKey(),
+              getDisplayMountPointInfo(mountPoint.getValue(), invokeUfs));
     }
     return mountPoints;
   }
@@ -1711,17 +1839,21 @@ public final class DefaultFileSystemMaster extends CoreMaster
       throw new InvalidPathException(
           ExceptionMessage.PATH_MUST_BE_MOUNT_POINT.getMessage(path));
     }
-    return getDisplayMountPointInfo(mMountTable.getMountTable().get(path.toString()));
+    return getDisplayMountPointInfo(mMountTable.getMountTable().get(path.toString()), true);
   }
 
   /**
    * Gets the mount point information for display from a mount information.
    *
+   * @param invokeUfs if true, invoke ufs to set ufs properties
    * @param mountInfo the mount information to transform
    * @return the mount point information
    */
-  private MountPointInfo getDisplayMountPointInfo(MountInfo mountInfo) {
+  private MountPointInfo getDisplayMountPointInfo(MountInfo mountInfo, boolean invokeUfs) {
     MountPointInfo info = mountInfo.toDisplayMountPointInfo();
+    if (!invokeUfs) {
+      return info;
+    }
     try (CloseableResource<UnderFileSystem> ufsResource =
              mUfsManager.get(mountInfo.getMountId()).acquireUfsResource()) {
       UnderFileSystem ufs = ufsResource.get();
@@ -1759,15 +1891,20 @@ public final class DefaultFileSystemMaster extends CoreMaster
         FileSystemMasterAuditContext auditContext =
             createAuditContext("delete", path, null, null)) {
 
-      syncMetadata(rpcContext,
-          path,
-          context.getOptions().getCommonOptions(),
-          context.getOptions().getRecursive() ? DescendantType.ALL : DescendantType.ONE,
-          auditContext,
-          LockedInodePath::getInodeOrNull,
-          (inodePath, permChecker) -> permChecker.checkParentPermission(Mode.Bits.WRITE, inodePath),
-          false
-      );
+      if (context.getOptions().getAlluxioOnly()) {
+        LOG.debug("alluxio-only deletion on path {} skips metadata sync", path);
+      } else {
+        syncMetadata(rpcContext,
+            path,
+            context.getOptions().getCommonOptions(),
+            context.getOptions().getRecursive() ? DescendantType.ALL : DescendantType.ONE,
+            auditContext,
+            LockedInodePath::getInodeOrNull,
+            (inodePath, permChecker) ->
+                permChecker.checkParentPermission(Mode.Bits.WRITE, inodePath),
+            false
+        );
+      }
 
       LockingScheme lockingScheme =
           createLockingScheme(path, context.getOptions().getCommonOptions(),
@@ -3501,7 +3638,8 @@ public final class DefaultFileSystemMaster extends CoreMaster
    * @param isGetFileInfo            true if syncing for a getFileInfo operation
    * @return syncStatus
    */
-  private InodeSyncStream.SyncStatus syncMetadata(RpcContext rpcContext, AlluxioURI path,
+  @VisibleForTesting
+  InodeSyncStream.SyncStatus syncMetadata(RpcContext rpcContext, AlluxioURI path,
       FileSystemMasterCommonPOptions options, DescendantType syncDescendantType,
       @Nullable FileSystemMasterAuditContext auditContext,
       @Nullable Function<LockedInodePath, Inode> auditContextSrcInodeFunc,
@@ -3510,9 +3648,9 @@ public final class DefaultFileSystemMaster extends CoreMaster
     if ((!options.hasSyncIntervalMs() || options.getSyncIntervalMs() < 0)
         && ServerConfiguration.getMs(PropertyKey.USER_FILE_METADATA_SYNC_INTERVAL) < 0) {
       if (ServerConfiguration.getList(
-          PropertyKey.MASTER_FILE_METADATA_SYNC_LIST, ",").contains(path.getPath())) {
+          TxPropertyKey.MASTER_FILE_METADATA_SYNC_LIST, ",").contains(path.getPath())) {
         options = options.toBuilder().setSyncIntervalMs(ServerConfiguration.getMs(
-            PropertyKey.MASTER_FILE_METADATA_SYNC_INTERVAL)).build();
+            TxPropertyKey.MASTER_FILE_METADATA_SYNC_INTERVAL)).build();
       }
     }
     LockingScheme syncScheme = createSyncLockingScheme(path, options, isGetFileInfo);
@@ -3944,7 +4082,7 @@ public final class DefaultFileSystemMaster extends CoreMaster
           tempUfsPath = PathUtils.concatUfsPath(mountPointUri,
               PathUtils.getPersistentTmpPath(resolution.getUri().toString()));
           LOG.debug("Generate tmp ufs path {} from ufs path {} for persistence.",
-              tempUfsPath, resolution.getUri().toString());
+              tempUfsPath, resolution.getUri());
         }
       }
 
@@ -4780,5 +4918,161 @@ public final class DefaultFileSystemMaster extends CoreMaster
   @Override
   public void decommissionWorkers(final Set<String> excludedWorkerSet, boolean addOnly) {
     mBlockMaster.decommissionWorkers(excludedWorkerSet, addOnly);
+  }
+
+  @Override
+  public long commandHeartbeat(long clientId, long metadataCacheSize)  {
+    if (clientId > 0) {
+      ClientInfo client = mClients.getFirstByField(ID_INDEX, clientId);
+      client.setMetadataCacheSize(metadataCacheSize);
+      client.setLastContactMs(System.currentTimeMillis());
+    }
+    // Get the journal index of the leader node. In most circumstances,
+    // the index of each node is same. If they are inconsistent, the largest
+    // journal Index belongs to the leader node.
+    return mMasterContext.getJournalSystem().getCurrentSequenceNumbers()
+        .values().stream().max(Long::compare).get();
+  }
+
+  @Override
+  public long getClientId(ClientIdentifier clientIdentifier) {
+    ClientInfo existingClients = mClients.getFirstByField(IDENTIFIER_INDEX, clientIdentifier);
+    if (existingClients != null) {
+      // This client address is already mapped to a client id.
+      long oldClientId = existingClients.getId();
+      LOG.warn("The client {} already exists as id {}.", clientIdentifier, oldClientId);
+      return oldClientId;
+    }
+
+    existingClients = findUnregisteredClient(clientIdentifier);
+    if (existingClients != null) {
+      return existingClients.getId();
+    }
+
+    // Generate a new client id.
+    long clientId = IdUtils.getRandomNonNegativeLong();
+    while (!mTempClients.add(new ClientInfo(clientId, clientIdentifier))) {
+      clientId = IdUtils.getRandomNonNegativeLong();
+    }
+
+    LOG.info("getClientId(): ClientIdentifier: {} id: {}", clientIdentifier, clientId);
+    return clientId;
+  }
+
+  /**
+   * Find a client which is considered lost or just gets its id.
+   * @param clientIdentifier the address used to find a client
+   * @return a {@link ClientInfo} which is presented in master but not registered,
+   *         or null if not client is found.
+   */
+  @Nullable
+  private ClientInfo findUnregisteredClient(ClientIdentifier clientIdentifier) {
+    for (IndexedSet<ClientInfo> clients: Arrays.asList(mTempClients, mLostClients)) {
+      ClientInfo client = clients.getFirstByField(IDENTIFIER_INDEX, clientIdentifier);
+      if (client != null) {
+        return client;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Find a client which is considered lost or just gets its id.
+   * @param clientId the id used to find a client
+   * @return a {@link ClientInfo} which is presented in master but not registered,
+   *         or null if not client is found.
+   */
+  @Nullable
+  private ClientInfo findUnregisteredClient(long clientId) {
+    for (IndexedSet<ClientInfo> clients: Arrays.asList(mTempClients, mLostClients)) {
+      ClientInfo client = clients.getFirstByField(ID_INDEX, clientId);
+      if (client != null) {
+        return client;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Re-register a lost client or complete registration after getting a client id.
+   * This method requires no locking on {@link ClientInfo} because it is only
+   * reading final fields.
+   *
+   * @param clientId the client id to register
+   */
+  @Nullable
+  private ClientInfo recordClientRegistration(long clientId) {
+    for (IndexedSet<ClientInfo> clients: Arrays.asList(mTempClients, mLostClients)) {
+      ClientInfo client = clients.getFirstByField(ID_INDEX, clientId);
+      if (client == null) {
+        continue;
+      }
+      mClients.add(client);
+      clients.remove(client);
+      LOG.warn("A lost client {} has requested its old id {}.",
+          client.getClientIdentifier(), client.getId());
+      return client;
+    }
+    return null;
+  }
+
+  @Override
+  public void clientRegister(long clientId, long startTime)
+      throws NotFoundException {
+    ClientInfo client = mClients.getFirstByField(ID_INDEX, clientId);
+    if (client == null) {
+      client = findUnregisteredClient(clientId);
+    }
+    if (client == null) {
+      throw new NotFoundException(ExceptionMessage.NO_CLIENT_FOUND.getMessage(clientId));
+    }
+    recordClientRegistration(clientId);
+    // Update the TS at the end of the process
+    client.setLastContactMs(System.currentTimeMillis());
+    client.setStartTimeMs(startTime);
+
+    LOG.info("registerClient(): {}", client);
+  }
+
+  @Override
+  public List<ClientInfo> getNormalClientInfoList()  {
+    return new ArrayList<>(mClients);
+  }
+
+  @Override
+  public List<ClientInfo> getLostClientInfoList() {
+    return new ArrayList<>(mLostClients);
+  }
+
+  /**
+   * Lost client periodic check.
+   */
+  public final class LostClientDetectionHeartbeatExecutor implements HeartbeatExecutor {
+
+    /**
+     * Constructs a new {@link LostClientDetectionHeartbeatExecutor}.
+     */
+    public LostClientDetectionHeartbeatExecutor() {}
+
+    @Override
+    public void heartbeat() {
+      long masterClientTimeoutMs =
+          ServerConfiguration.getMs(TxPropertyKey.MASTER_CLIENT_TIMEOUT_MS);
+      for (ClientInfo clientInfo : mClients) {
+        // This is not locking because the field is atomic
+        final long lastUpdate = mClock.millis() - clientInfo.getLastContactMs();
+        if (lastUpdate > masterClientTimeoutMs) {
+          LOG.error("The client {}({}) timed out after {}ms without a heartbeat!",
+              clientInfo.getId(), clientInfo.getClientIdentifier(), lastUpdate);
+          mLostClients.add(clientInfo);
+          mClients.remove(clientInfo);
+        }
+      }
+    }
+
+    @Override
+    public void close() {
+      // Nothing to clean up
+    }
   }
 }

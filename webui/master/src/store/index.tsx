@@ -43,6 +43,12 @@ import { IWorkersState } from './workers/types';
 import { IMountTableState } from './mounttable/types';
 import { initialMountTableState, mountTableReducer } from './mounttable/reducer';
 import { mountTableSaga } from './mounttable/sagas';
+import { stackSaga } from '@alluxio/common-ui/src/store/stacks/sagas';
+import { IStacksState } from '@alluxio/common-ui/src/store/stacks/types';
+import { initialStacksState, stacksReducer } from '@alluxio/common-ui/src/store/stacks/reducer';
+import { IClientsState } from './clients/types';
+import { clientsReducer, initialClientsState } from './clients/reducer';
+import { clientsSaga } from './clients/sagas';
 
 export interface IApplicationState {
   browse: IBrowseState;
@@ -55,7 +61,9 @@ export interface IApplicationState {
   refresh: IRefreshState;
   router?: RouterState;
   workers: IWorkersState;
+  stacks: IStacksState;
   mountTable: IMountTableState;
+  clients: IClientsState;
 }
 
 export const rootReducer = (history: History): Reducer<IApplicationState> =>
@@ -69,8 +77,10 @@ export const rootReducer = (history: History): Reducer<IApplicationState> =>
     overview: overviewReducer,
     refresh: refreshReducer,
     router: connectRouter(history),
+    stacks: stacksReducer,
     workers: workersReducer,
     mountTable: mountTableReducer,
+    clients: clientsReducer,
   });
 
 export const rootSaga = function*(): IterableIterator<AllEffect<ForkEffect>> {
@@ -82,8 +92,10 @@ export const rootSaga = function*(): IterableIterator<AllEffect<ForkEffect>> {
     fork(logsSaga),
     fork(metricsSaga),
     fork(overviewSaga),
+    fork(stackSaga),
     fork(workersSaga),
     fork(mountTableSaga),
+    fork(clientsSaga),
   ]);
 };
 
@@ -96,6 +108,8 @@ export const initialState: IApplicationState = {
   metrics: initialMetricsState,
   overview: initialOverviewState,
   refresh: initialRefreshState,
+  stacks: initialStacksState,
   workers: initialWorkersState,
   mountTable: initialMountTableState,
+  clients: initialClientsState,
 };

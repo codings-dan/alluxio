@@ -104,6 +104,10 @@ public abstract class AbstractUfsManager implements UfsManager {
   private UfsClient mRootUfsClient;
   private UfsClient mJournalUfsClient;
   protected final Closer mCloser;
+  private final Map<Class<? extends UfsService>, UfsServiceFactory> mUfsServicesFactories =
+      new ConcurrentHashMap<>();
+  private final Map<Long, Map<Class<? extends UfsService>, UfsService>>
+      mMountIdToUfsServicesMap = new ConcurrentHashMap<>();
 
   protected AbstractUfsManager() {
     mCloser = Closer.create();
@@ -156,6 +160,33 @@ public abstract class AbstractUfsManager implements UfsManager {
   }
 
   /**
+   * add UfsServers for Mount.
+   * @param mountId the mount id
+   * @param ufsUri the UFS path
+   * @param ufsConf the UFS configuration
+   */
+  private void addUfsServers(long mountId, final AlluxioURI ufsUri,
+                     final UnderFileSystemConfiguration ufsConf) {
+    Map<Class<? extends UfsService>, UfsService> ufsServices =
+        mMountIdToUfsServicesMap.computeIfAbsent(mountId, id -> new ConcurrentHashMap<>());
+    LOG.debug("addMount UFS {} URI {} mUfsServicesFactories size {}",
+        mountId, ufsUri, mUfsServicesFactories.size());
+
+    for (Map.Entry<Class<? extends UfsService>, UfsServiceFactory> entry
+        : mUfsServicesFactories.entrySet()) {
+      ufsServices.computeIfAbsent(entry.getKey(), serviceType -> {
+        LOG.debug("Creating UFS service {} for URI {}", serviceType.getName(), ufsUri);
+        UfsService service = entry.getValue().createUfsService(ufsUri.toString(),
+            ufsConf, serviceType);
+        if (service != null) {
+          LOG.debug("Registering UFS service {} for URI {}", serviceType.getName(), ufsUri);
+        }
+        return service;
+      });
+    }
+  }
+
+  /**
    * Takes any necessary actions required to establish a connection to the under file system.
    * The implementation will either call {@link UnderFileSystem#connectFromMaster(String)} or
    *  {@link UnderFileSystem#connectFromWorker(String)} depending on the running process.
@@ -165,10 +196,31 @@ public abstract class AbstractUfsManager implements UfsManager {
   @Override
   public void addMount(long mountId, final AlluxioURI ufsUri,
       final UnderFileSystemConfiguration ufsConf) {
+    LOG.debug("addMount UFS {} URI {}", mountId, ufsUri);
     Preconditions.checkArgument(mountId != IdUtils.INVALID_MOUNT_ID, "mountId");
     Preconditions.checkNotNull(ufsUri, "ufsUri");
     Preconditions.checkNotNull(ufsConf, "ufsConf");
     mMountIdToUfsInfoMap.put(mountId, new UfsClient(() -> getOrAdd(ufsUri, ufsConf), ufsUri));
+    addUfsServers(mountId, ufsUri, ufsConf);
+  }
+
+  /**
+   * add UfsServers for root ufs.
+   */
+  public void addUfsServersForRootUfs() {
+    Map<String, String> rootConf =
+        ServerConfiguration.getNestedProperties(PropertyKey.MASTER_MOUNT_TABLE_ROOT_OPTION);
+    boolean rootReadOnly =
+        ServerConfiguration.getBoolean(PropertyKey.MASTER_MOUNT_TABLE_ROOT_READONLY);
+    boolean rootShared = ServerConfiguration.getBoolean(PropertyKey.MASTER_MOUNT_TABLE_ROOT_SHARED);
+    UnderFileSystemConfiguration ufsConfig = UnderFileSystemConfiguration.defaults(
+        ServerConfiguration.global()).setReadOnly(rootReadOnly).setShared(rootShared)
+        .createMountSpecificConf(rootConf);
+
+    String rootUri = ServerConfiguration.get(PropertyKey.MASTER_MOUNT_TABLE_ROOT_UFS);
+    AlluxioURI ufsUri = new AlluxioURI(rootUri);
+
+    addUfsServers(IdUtils.ROOT_MOUNT_ID, ufsUri, ufsConfig);
   }
 
   @Override
@@ -177,6 +229,21 @@ public abstract class AbstractUfsManager implements UfsManager {
     // TODO(binfan): check the refcount of this ufs in mUnderFileSystemMap and remove it if this is
     // no more used. Currently, it is possibly used by out mount too.
     mMountIdToUfsInfoMap.remove(mountId);
+    Map<Class<? extends UfsService>, UfsService> ufsServices =
+        mMountIdToUfsServicesMap.remove(mountId);
+    if (ufsServices != null) {
+      for (Map.Entry<Class<? extends UfsService>, UfsService>  entry
+          : ufsServices.entrySet()) {
+        LOG.debug("Stopping UFS service {} for mount {}", entry.getKey().getName(), mountId);
+        try {
+          entry.getValue().close();
+        } catch (IOException e) {
+          LOG.error("Unable to stop service {} for mount {}: {}", entry.getKey().getName(), mountId,
+              e.getMessage());
+        }
+      }
+      LOG.debug("Removed UFS services for mount {}", mountId);
+    }
   }
 
   @Override
@@ -232,5 +299,25 @@ public abstract class AbstractUfsManager implements UfsManager {
   @Override
   public void close() throws IOException {
     mCloser.close();
+  }
+
+  @Override
+  public void registerUfsServiceFactory(Class<? extends UfsService> serviceType,
+      UfsServiceFactory factory) {
+    Preconditions.checkNotNull(serviceType, "serviceType");
+    Preconditions.checkNotNull(factory, "factory");
+    LOG.info("AbstractUfsManager.registerUfsServiceFactory for serviceType {} ,factory {} ",
+        serviceType, factory);
+    mUfsServicesFactories.put(serviceType, factory);
+  }
+
+  @Override
+  public <T extends UfsService> T getUfsService(long mountId, Class<T> serviceType) {
+    Map<Class<? extends UfsService>, UfsService> services =
+        mMountIdToUfsServicesMap.get(mountId);
+    if (services != null) {
+      return (T) services.get(serviceType);
+    }
+    return null;
   }
 }

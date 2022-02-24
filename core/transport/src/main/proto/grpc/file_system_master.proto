@@ -68,6 +68,14 @@ message CheckConsistencyPRequest {
   optional CheckConsistencyPOptions options = 2;
 }
 
+message ExistsPRequest {
+  optional string path = 1;
+  optional ExistsPOptions options = 2;
+}
+message ExistsPResponse {
+  optional bool exists = 1;
+}
+
 message CompleteFilePResponse {}
 message CompleteFilePOptions {
   optional int64 ufsLength = 1;
@@ -501,6 +509,33 @@ message DecommissionWorkersPOptions {
   repeated string excludedWorkers = 2;
 }
 
+message GetClientIdPRequest {
+  optional grpc.ClientIdentifier ClientIdentifier = 1;
+  optional int32 pid = 2;
+}
+message GetClientIdPResponse {
+  optional int64 clientId = 1;
+}
+
+message ClientRegisterPResponse {
+}
+message ClientRegisterPRequest {
+  optional int64 clientId = 1;
+  optional int64 startTime = 2;
+}
+
+message CommandHeartbeatPResponse {
+  required CommandHeartbeatPOptions options = 1;
+}
+message CommandHeartbeatPRequest {
+  optional int64 clientId = 1;
+  optional int64 metadataCacheSize = 2;
+}
+
+message CommandHeartbeatPOptions {
+  required int64 journalId = 1;
+}
+
 /**
  * This interface contains file system master service endpoints for Alluxio clients.
  */
@@ -515,6 +550,11 @@ service FileSystemMasterClientService {
    * Checks the consistency of the files and directores with the path as the root of the subtree
    */
   rpc CheckConsistency(CheckConsistencyPRequest) returns (CheckConsistencyPResponse);
+
+  /**
+   * Checks the existence of the file or directory.
+   */
+  rpc Exists(ExistsPRequest) returns (ExistsPResponse);
 
   /**
    * Marks a file as completed.
@@ -637,6 +677,12 @@ service FileSystemMasterClientService {
   * Decommission workers defined by excluded-workers file.
   */
   rpc DecommissionWorkers(DecommissionWorkersPOptions) returns (DecommissionWorkersPResponse);
+
+  rpc CommandHeartbeat(CommandHeartbeatPRequest) returns (CommandHeartbeatPResponse);
+
+  rpc ClientRegister(ClientRegisterPRequest) returns (ClientRegisterPResponse);
+
+  rpc GetClientId(GetClientIdPRequest) returns (GetClientIdPResponse);
 }
 
 message FileSystemHeartbeatPResponse {

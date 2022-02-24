@@ -35,6 +35,7 @@ import alluxio.wire.TieredIdentity;
 import alluxio.wire.UfsInfo;
 import alluxio.wire.WorkerInfo;
 import alluxio.wire.WorkerNetAddress;
+import alluxio.wire.ClientIdentifier;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HostAndPort;
@@ -106,8 +107,8 @@ public final class GrpcUtils {
       acl = new AccessControlList();
     }
 
-    acl.setOwningUser(pAcl.getOwner());
-    acl.setOwningGroup(pAcl.getOwningGroup());
+    acl.setOwningUser(pAcl.getOwner().intern());
+    acl.setOwningGroup(pAcl.getOwningGroup().intern());
     acl.setMode((short) pAcl.getMode());
 
     if (pAcl.getEntriesCount() > 0) {
@@ -343,6 +344,14 @@ public final class GrpcUtils {
     workerNetAddress.setDomainSocketPath(workerNetPAddress.getDomainSocketPath());
     workerNetAddress.setTieredIdentity(fromProto(workerNetPAddress.getTieredIdentity()));
     return workerNetAddress;
+  }
+
+  public static ClientIdentifier fromProto(alluxio.grpc.ClientIdentifier clientIdentifier) {
+    ClientIdentifier identifier = new ClientIdentifier();
+    identifier.setHost(clientIdentifier.getHost());
+    identifier.setContainerHost(clientIdentifier.getContainerHost());
+    identifier.setPid(clientIdentifier.getPid());
+    return identifier;
   }
 
   /**
@@ -623,6 +632,14 @@ public final class GrpcUtils {
       address.setTieredIdentity(toProto(workerNetAddress.getTieredIdentity()));
     }
     return address.build();
+  }
+
+  public static alluxio.grpc.ClientIdentifier toProto(ClientIdentifier clientIdentifier) {
+    alluxio.grpc.ClientIdentifier.Builder identifier = alluxio.grpc.ClientIdentifier.newBuilder()
+        .setHost(clientIdentifier.getHost())
+        .setContainerHost(clientIdentifier.getContainerHost())
+        .setPid(clientIdentifier.getPid());
+    return identifier.build();
   }
 
   /**

@@ -19,7 +19,6 @@ import static org.junit.Assert.assertTrue;
 import alluxio.client.file.cache.PageId;
 import alluxio.client.file.cache.PageStore;
 
-import org.apache.logging.log4j.util.Strings;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -66,10 +65,10 @@ public class LocalPageStoreTest {
       mTempList.add(mTemp1);
       mTempList.add(mTemp2);
     }
-    String rootDir = Strings.join(mTempList.stream().map(
+    List<Path> rootDir = mTempList.stream().map(
         temp ->
-            temp.getRoot().getAbsolutePath()).collect(Collectors.toList()), ',');
-    mOptions.setRootDir(rootDir);
+            Paths.get(temp.getRoot().getAbsolutePath())).collect(Collectors.toList());
+    mOptions.setRootDirs(rootDir);
   }
 
   @Test
@@ -88,9 +87,9 @@ public class LocalPageStoreTest {
       pageStore.put(id, "test".getBytes());
     }
     long actualCount = 0;
-    for (String root : mOptions.getRootDir().split(",")) {
+    for (Path root : mOptions.getRootDirs()) {
       actualCount += Files.list(
-          Paths.get(root, Long.toString(mOptions.getPageSize()))).count();
+          Paths.get(root.toString(), Long.toString(mOptions.getPageSize()))).count();
     }
     assertEquals(mRootDirCount, actualCount);
   }
@@ -106,9 +105,9 @@ public class LocalPageStoreTest {
       pageStore.put(id, "test".getBytes());
     }
     long actualCount = 0;
-    for (String root : mOptions.getRootDir().split(",")) {
+    for (Path root : mOptions.getRootDirs()) {
       actualCount += Files.list(
-          Paths.get(root, Long.toString(mOptions.getPageSize()))).count();
+          Paths.get(root.toString(), Long.toString(mOptions.getPageSize()))).count();
     }
     assertEquals(10, actualCount);
   }

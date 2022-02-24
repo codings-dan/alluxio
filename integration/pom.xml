@@ -26,6 +26,7 @@
     <module>fuse</module>
     <module>jnifuse</module>
     <module>tools</module>
+    <module>authorization</module>
   </modules>
 
   <properties>
