@@ -21,6 +21,8 @@ import alluxio.grpc.AsyncCacheResponse;
 import alluxio.grpc.BlockWorkerGrpc;
 import alluxio.grpc.CacheRequest;
 import alluxio.grpc.CacheResponse;
+import alluxio.grpc.CachesRequest;
+import alluxio.grpc.CachesResponse;
 import alluxio.grpc.ClearMetricsRequest;
 import alluxio.grpc.ClearMetricsResponse;
 import alluxio.grpc.CreateLocalBlockRequest;
@@ -162,6 +164,14 @@ public class BlockWorkerClientServiceHandler extends BlockWorkerGrpc.BlockWorker
     RpcUtils.call(LOG, () -> {
       mBlockWorker.cache(request);
       return CacheResponse.getDefaultInstance();
+    }, "cache", "request=%s", responseObserver, request);
+  }
+
+  @Override
+  public void caches(CachesRequest request, StreamObserver<CachesResponse> responseObserver) {
+    RpcUtils.call(LOG, () -> {
+      mBlockWorker.caches(request);
+      return CachesResponse.getDefaultInstance();
     }, "cache", "request=%s", responseObserver, request);
   }
 

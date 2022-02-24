@@ -13,6 +13,7 @@ package alluxio.client.block.stream;
 
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.grpc.CacheRequest;
+import alluxio.grpc.CachesRequest;
 import alluxio.grpc.ClearMetricsRequest;
 import alluxio.grpc.ClearMetricsResponse;
 import alluxio.grpc.CreateLocalBlockRequest;
@@ -149,4 +150,12 @@ public interface BlockWorkerClient extends Closeable {
    * @throws StatusRuntimeException if any error occurs
    */
   void cache(CacheRequest request);
+
+  /**
+   * Caches a block.
+   *
+   * @param request the cache request
+   * @throws StatusRuntimeException if any error occurs
+   */
+  void caches(CachesRequest request);
 }

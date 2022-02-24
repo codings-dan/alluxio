@@ -17,6 +17,7 @@ import alluxio.exception.status.AlluxioStatusException;
 import alluxio.exception.status.UnauthenticatedException;
 import alluxio.grpc.BlockWorkerGrpc;
 import alluxio.grpc.CacheRequest;
+import alluxio.grpc.CachesRequest;
 import alluxio.grpc.ClearMetricsRequest;
 import alluxio.grpc.ClearMetricsResponse;
 import alluxio.grpc.CreateLocalBlockRequest;
@@ -239,6 +240,19 @@ public class DefaultBlockWorkerClient implements BlockWorkerClient {
         throw e;
       }
       LOG.warn("Error sending async cache request {} to worker {}.", request, mAddress, e);
+    }
+  }
+
+  @Override
+  public void caches(CachesRequest request) {
+    boolean async = request.getAsync();
+    try {
+      mRpcBlockingStub.withDeadlineAfter(mRpcTimeoutMs, TimeUnit.MILLISECONDS).caches(request);
+    } catch (Exception e) {
+      if (!async) {
+        throw e;
+      }
+      LOG.warn("Error sending async caches request {} to worker {}.", request, mAddress, e);
     }
   }
 }

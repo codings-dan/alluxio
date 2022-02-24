@@ -179,6 +179,7 @@ public class PlanTracker {
       JobServerContext ctx, List<WorkerInfo> workers, long jobId) throws
       JobDoesNotExistException, ResourceExhaustedException {
     if (removeFinished()) {
+      // todo add metrics
       PlanCoordinator planCoordinator = PlanCoordinator.create(manager, ctx,
           workers, jobId, jobConfig, this::statusChangeCallback);
       mCoordinators.put(jobId, planCoordinator);

@@ -101,7 +101,7 @@ public final class DistributedLoadUtils {
       if (!uriStatus.isFolder()) {
         if (!uriStatus.isCompleted()) {
           incompleteCount.increment();
-          System.out.printf("Ignored load because: %s is in incomplete status",
+          System.out.printf("Ignored load because: %s is in incomplete status%n",
               uriStatus.getPath());
           return;
         }
@@ -122,7 +122,7 @@ public final class DistributedLoadUtils {
       }
     });
     if (incompleteCount.longValue() > 0) {
-      System.out.printf("Ignore load %d paths because they are in incomplete status",
+      System.out.printf("Ignore load %d paths because they are in incomplete status%n",
           incompleteCount.longValue());
     }
   }
@@ -223,7 +223,7 @@ public final class DistributedLoadUtils {
       String pathString = jobConfig.getJobConfigs().stream().map(x -> x.get("filePath"))
           .collect(Collectors.joining(","));
       mFilesPathString = String.format("[%s]", StringUtils.abbreviate(pathString, 80));
-      System.out.printf("files: %s" + " loading", mFilesPathString);
+      System.out.printf("files: %s" + " loading%n", mFilesPathString);
     }
 
     @Override
