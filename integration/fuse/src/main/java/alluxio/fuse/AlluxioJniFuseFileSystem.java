@@ -541,10 +541,19 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem
         // or fuse.truncate(size = 0) to delete existing file
         // otherwise cannot overwrite existing file
         // but open(O_WRONLY) is ok when file length == 0 and completed.
-        LOG.error(String.format("Cannot overwrite existing file %s "
-            + "without O_TRUNC flag or fuse.truncate(size=0), flag 0x%x",
-            path, fi.flags.get()));
-        return -ErrorCodes.EEXIST();
+        if (mWorkAroundSet.contains("write")) {
+          try {
+            mFileSystem.delete(uri);
+          } catch (Throwable e) {
+            LOG.error("Failed to write {}: ", path, e);
+            return -ErrorCodes.EIO();
+          }
+        } else {
+          LOG.error(String.format("Cannot overwrite existing file %s "
+                  + "without O_TRUNC flag or fuse.truncate(size=0), flag 0x%x",
+              path, fi.flags.get()));
+          return -ErrorCodes.EEXIST();
+        }
       }
 
       // open(O_RDWR) without O_TRUNC() will be treated as read-only first
