@@ -100,6 +100,14 @@ public final class TxPropertyKey {
           .setScope(Scope.MASTER)
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .build();
+  public static final PropertyKey MASTER_METASTORE_BLOCK_STORE_DIR =
+      new Builder(Name.MASTER_METASTORE_BLOCK_STORE_DIR)
+          .setDefaultValue(String.format("${%s}", PropertyKey.Name.MASTER_METASTORE_DIR))
+          .setDescription("The block store metastore work directory. "
+              + "Only some metastores need disk.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.MASTER)
+          .build();
 
   //
   // Shimfs  related properties
@@ -389,6 +397,8 @@ public final class TxPropertyKey {
     public static final String MASTER_SLOW_LIST_OPERATION_THRESHOLD =
         "alluxio.master.slow.list.operation.threshold";
 
+    public static final String MASTER_METASTORE_BLOCK_STORE_DIR =
+        "alluxio.master.metastore.block.store.dir";
     //
     // Worker related properties
     //

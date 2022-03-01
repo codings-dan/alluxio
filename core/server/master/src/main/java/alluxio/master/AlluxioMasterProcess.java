@@ -14,6 +14,7 @@ package alluxio.master;
 import static alluxio.util.network.NetworkAddressUtils.ServiceType;
 
 import alluxio.AlluxioURI;
+import alluxio.conf.TxPropertyKey;
 import alluxio.executor.ExecutorServiceBuilder;
 import alluxio.RuntimeConstants;
 import alluxio.conf.PropertyKey;
@@ -105,12 +106,14 @@ public class AlluxioMasterProcess extends MasterProcess {
       mSafeModeManager = new DefaultSafeModeManager();
       mBackupManager = new BackupManager(mRegistry);
       String baseDir = ServerConfiguration.get(PropertyKey.MASTER_METASTORE_DIR);
+      String blockStoreBaseDir =
+          ServerConfiguration.get(TxPropertyKey.MASTER_METASTORE_BLOCK_STORE_DIR);
       mUfsManager = new MasterUfsManager();
       mContext = CoreMasterContext.newBuilder()
           .setJournalSystem(mJournalSystem)
           .setSafeModeManager(mSafeModeManager)
           .setBackupManager(mBackupManager)
-          .setBlockStoreFactory(MasterUtils.getBlockStoreFactory(baseDir))
+          .setBlockStoreFactory(MasterUtils.getBlockStoreFactory(blockStoreBaseDir))
           .setInodeStoreFactory(MasterUtils.getInodeStoreFactory(baseDir))
           .setStartTimeMs(mStartTimeMs)
           .setPort(NetworkAddressUtils
