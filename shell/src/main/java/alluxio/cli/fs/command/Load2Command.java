@@ -54,8 +54,12 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import javax.annotation.concurrent.ThreadSafe;
 
 /**
@@ -81,78 +85,49 @@ public final class Load2Command extends AbstractFileSystemCommand {
           .argName("batch-size")
           .desc("Number of files per request")
           .build();
+  private static final Option MAX_ACTIVES =
+      Option.builder()
+          .longOpt("actives")
+          .required(false)
+          .hasArg(true)
+          .numberOfArgs(1)
+          .type(Number.class)
+          .argName("actives")
+          .desc("Max actives")
+          .build();
+  private static final Option THREADS =
+      Option.builder()
+          .longOpt("threads")
+          .required(false)
+          .hasArg(true)
+          .numberOfArgs(1)
+          .type(Number.class)
+          .argName("threads")
+          .desc("threads num")
+          .build();
+  private static final Option DETAIL =
+      Option.builder("detail")
+          .longOpt("detail")
+          .required(false)
+          .hasArg(false)
+          .desc("print detail info")
+          .build();
 
-  int mBatchSize;
-  boolean mLeftJobFlag = false;
-  AtomicInteger mActives = new AtomicInteger();
-  int mMaxActives;
   int mReTryTimes = 3;
+  // Whether to output detailed information
+  boolean mDetail = false;
+  int mBatchSize;
+  // The maximum number of simultaneous tasks allowed by the cluster
+  int mMaxActives;
+  // Number of tasks currently in progress
+  AtomicInteger mActives;
+
+  List<Future<?>> mTaskFutures = new LinkedList<>();
+  ExecutorService mExecutor;
   Map<WorkerNetAddress, LinkedBlockingQueue<CacheBlockInfo>> mWorkerCacheRequestsMap =
       new HashMap<>();
-
-  public class CacheTask implements Runnable {
-
-    private WorkerNetAddress mWorkerNetAddress;
-
-    public CacheTask(WorkerNetAddress workerNetAddress) {
-      mWorkerNetAddress = workerNetAddress;
-    }
-
-    @Override
-    public void run() {
-      LinkedBlockingQueue<CacheBlockInfo> cacheBlockInfos =
-          mWorkerCacheRequestsMap.get(mWorkerNetAddress);
-      String host = mWorkerNetAddress.getHost();
-      // issues#11172: If the worker is in a container, use the container hostname
-      // to establish the connection.
-      if (!mWorkerNetAddress.getContainerHost().equals("")) {
-        host = mWorkerNetAddress.getContainerHost();
-      }
-      List<CacheBlockInfo> pool = new LinkedList<>();
-      int finished = 0;
-      int failed = 0;
-
-      try (CloseableResource<BlockWorkerClient> blockWorker = mFsContext.acquireBlockWorkerClient(
-          mWorkerNetAddress)) {
-        while (true) {
-          if (cacheBlockInfos.size() >= mBatchSize || mLeftJobFlag) {
-            RetryPolicy retryPolicy = new CountingRetry(mReTryTimes);
-            cacheBlockInfos.stream().limit(mBatchSize)
-                .forEach(ignore -> pool.add(cacheBlockInfos.remove()));
-
-            while (retryPolicy.attempt()) {
-              CachesRequest cachesRequest =
-                  CachesRequest.newBuilder().addAllCacheBlockInfo(pool).setSourceHost(host)
-                      .setSourcePort(mWorkerNetAddress.getDataPort()).build();
-              try {
-                blockWorker.get().caches(cachesRequest);
-              } catch (Exception e) {
-                System.out.printf("Failed to complete caches request for the Worker %s, "
-                    + "Retry: %d%n", host, retryPolicy.getAttemptCount());
-                e.printStackTrace();
-              }
-            }
-            if (retryPolicy.getAttemptCount() == mReTryTimes) {
-              failed += pool.size();
-            }
-            finished += pool.size();
-            pool.clear();
-            mActives.addAndGet(-mBatchSize);
-            System.out.printf(
-                "The worker %s cached num: %d failed num: %d\r", host, finished, failed);
-          } else {
-            CommonUtils.sleepMs(10);
-          }
-          if (mLeftJobFlag && cacheBlockInfos.isEmpty()) {
-            return;
-          }
-        }
-      } catch (Exception e) {
-        System.out.printf("Failed to complete cache request for the Worker %s: %n", host);
-        e.printStackTrace();
-      }
-    }
-  }
+  Map<WorkerNetAddress, AtomicInteger> mWorksTasksCountMap = new HashMap<>();
+  Map<WorkerNetAddress, AtomicInteger> mWorksFailedTasksCountMap = new HashMap<>();
 
   /**
    * Constructs a new instance to load a file or directory in Alluxio space.
@@ -170,7 +145,12 @@ public final class Load2Command extends AbstractFileSystemCommand {
 
   @Override
   public Options getOptions() {
-    return new Options().addOption(LOCAL_OPTION).addOption(BATCH_SIZE_OPTION);
+    return new Options()
+        .addOption(LOCAL_OPTION)
+        .addOption(BATCH_SIZE_OPTION)
+        .addOption(THREADS)
+        .addOption(MAX_ACTIVES)
+        .addOption(DETAIL);
   }
 
   @Override
@@ -179,24 +159,48 @@ public final class Load2Command extends AbstractFileSystemCommand {
     load(plainPath, cl.hasOption(LOCAL_OPTION.getLongOpt()));
   }
 
-  @Override
-  public int run(CommandLine cl) throws AlluxioException, IOException {
-    String[] args = cl.getArgs();
-    AlluxioURI path = new AlluxioURI(args[0]);
-    mBatchSize = FileSystemShellUtils.getIntArg(cl, BATCH_SIZE_OPTION, 1);
+  private void init(CommandLine cl) throws IOException {
     List<BlockWorkerInfo> cachedWorkers = mFsContext.getCachedWorkers();
     if (cachedWorkers.isEmpty()) {
       throw new UnavailableException(ExceptionMessage.NO_WORKER_AVAILABLE.getMessage());
     }
-    mMaxActives = cachedWorkers.size() * mBatchSize;
+    mBatchSize = FileSystemShellUtils.getIntArg(cl, BATCH_SIZE_OPTION, 50);
+    mMaxActives = FileSystemShellUtils.getIntArg(cl, MAX_ACTIVES, 1000 * cachedWorkers.size());
+    mDetail = cl.hasOption(DETAIL.getLongOpt());
 
     for (BlockWorkerInfo blockWorkerInfo: cachedWorkers) {
       mWorkerCacheRequestsMap.put(blockWorkerInfo.getNetAddress(), new LinkedBlockingQueue<>());
-      Thread thread = new Thread(new CacheTask(blockWorkerInfo.getNetAddress()));
-      thread.start();
+      mWorksTasksCountMap.put(blockWorkerInfo.getNetAddress(), new AtomicInteger());
+      mWorksFailedTasksCountMap.put(blockWorkerInfo.getNetAddress(), new AtomicInteger());
     }
+    int threadsNum = FileSystemShellUtils.getIntArg(cl, THREADS,
+        Math.min(8 * Runtime.getRuntime().availableProcessors(), 4 * cachedWorkers.size()));
+    mExecutor = Executors.newFixedThreadPool(threadsNum);
+  }
 
+  @Override
+  public int run(CommandLine cl) throws AlluxioException, IOException {
+    String[] args = cl.getArgs();
+    AlluxioURI path = new AlluxioURI(args[0]);
+    init(cl);
     runWildCardCmd(path, cl);
+
+    int successfulLoad = 0;
+    int failedLoad = 0;
+    for (Map.Entry<WorkerNetAddress, AtomicInteger> entry : mWorksTasksCountMap.entrySet()) {
+      System.out.printf("%s\tloaded successfully: %s\tfailed : %s%n", entry.getKey().getHost(),
+          mWorksTasksCountMap.get(entry.getKey()).intValue(),
+          mWorksFailedTasksCountMap.get(entry.getKey()).intValue());
+      successfulLoad += mWorksTasksCountMap.get(entry.getKey()).intValue();
+      failedLoad += mWorksFailedTasksCountMap.get(entry.getKey()).intValue();
+    }
+    System.out.printf("Summarize: %n  loaded successfully sum : %s\tfailed : %s%n",
+        successfulLoad, failedLoad);
+
+    mExecutor.shutdown();
+    while (mExecutor.isTerminated()) {
+      CommonUtils.sleepMs(10);
+    }
     return 0;
   }
 
@@ -208,6 +212,7 @@ public final class Load2Command extends AbstractFileSystemCommand {
    */
   private void load(AlluxioURI filePath, boolean local)
       throws AlluxioException, IOException {
+    mActives = new AtomicInteger();
     ListStatusPOptions options = ListStatusPOptions.newBuilder().setRecursive(true).build();
     mFileSystem.iterateStatus(filePath, options, uriStatus -> {
       if (!uriStatus.isFolder()) {
@@ -240,7 +245,10 @@ public final class Load2Command extends AbstractFileSystemCommand {
         }
       }
     });
-    mLeftJobFlag = true;
+
+    waitForTask();
+    submitLeftRequest();
+    System.out.printf("load %s Successfully %n", filePath);
   }
 
   private void runLoadTask(AlluxioURI filePath, URIStatus status, boolean local)
@@ -270,7 +278,8 @@ public final class Load2Command extends AbstractFileSystemCommand {
 
   @Override
   public String getUsage() {
-    return "load2 [--local]  [--batch-size <num>] <path> ";
+    return "load2 [--local]  [--batch-size <num>] "
+        + " [--actives <num>] [--threads <num>] [--detail] <path> ";
   }
 
   @Override
@@ -287,12 +296,6 @@ public final class Load2Command extends AbstractFileSystemCommand {
       Protocol.OpenUfsBlockOptions options) {
     BlockInfo info = status.getBlockInfo(blockId);
     long blockLength = info.getLength();
-    String host = dataSource.getHost();
-    // issues#11172: If the worker is in a container, use the container hostname
-    // to establish the connection.
-    if (!dataSource.getContainerHost().equals("")) {
-      host = dataSource.getContainerHost();
-    }
     CacheBlockInfo blockInfo = CacheBlockInfo.newBuilder()
         .setBlockId(blockId).setLength(blockLength)
         .setOpenUfsBlockOptions(options).build();
@@ -300,11 +303,110 @@ public final class Load2Command extends AbstractFileSystemCommand {
     submitCacheRequest(dataSource, blockInfo);
   }
 
-  private void submitCacheRequest(WorkerNetAddress dataSource, CacheBlockInfo blockInfo) {
+  private void submitCacheRequest(WorkerNetAddress worker, CacheBlockInfo blockInfo) {
     while (mActives.intValue() > mMaxActives) {
-      CommonUtils.sleepMs(10);
+      CommonUtils.sleepMs(5);
     }
     mActives.incrementAndGet();
-    mWorkerCacheRequestsMap.get(dataSource).add(blockInfo);
+    mWorkerCacheRequestsMap.get(worker).add(blockInfo);
+    mWorksTasksCountMap.get(worker).incrementAndGet();
+    if (mWorksTasksCountMap.get(worker).get() % mBatchSize == 0) {
+      submitBatchRequest(worker);
+    }
+  }
+
+  private void submitLeftRequest() {
+    for (WorkerNetAddress worker :mWorkerCacheRequestsMap.keySet()) {
+      submitBatchRequest(worker);
+      waitForTask();
+    }
+  }
+
+  private void submitBatchRequest(WorkerNetAddress worker) {
+    Future<?> future = mExecutor.submit(new CacheTask(worker));
+    mTaskFutures.add(future);
+  }
+
+  private void waitForTask() {
+    for (Future<?> taskFuture :mTaskFutures) {
+      while (!taskFuture.isDone()) {
+        CommonUtils.sleepMs(5);
+      }
+    }
+    mTaskFutures.clear();
+  }
+
+  public class CacheTask implements Runnable {
+
+    private WorkerNetAddress mWorkerNetAddress;
+
+    public CacheTask(WorkerNetAddress workerNetAddress) {
+      mWorkerNetAddress = workerNetAddress;
+    }
+
+    private int sendCachesRequestWithRetry(CloseableResource<BlockWorkerClient> blockWorker ,
+        List<CacheBlockInfo> pool, String dataSource) {
+      RetryPolicy retryPolicy = new CountingRetry(mReTryTimes);
+      while (retryPolicy.attempt()) {
+        CachesRequest cachesRequest =
+            CachesRequest.newBuilder().addAllCacheBlockInfo(pool).setSourceHost(dataSource)
+                .setSourcePort(mWorkerNetAddress.getDataPort()).build();
+        try {
+          blockWorker.get().caches(cachesRequest);
+        } catch (Exception e) {
+          System.out.printf("Failed to complete caches request for the Worker %s, "
+              + "Retry: %d%n", dataSource, retryPolicy.getAttemptCount());
+          e.printStackTrace();
+          continue;
+        }
+        break;
+      }
+      if (retryPolicy.getAttemptCount() == mReTryTimes) {
+        return 0;
+      }
+      return pool.size();
+    }
+
+    @Override
+    public void run() {
+      LinkedBlockingQueue<CacheBlockInfo> cacheBlockInfos =
+          mWorkerCacheRequestsMap.get(mWorkerNetAddress);
+      String dataSource = mWorkerNetAddress.getHost();
+      // issues#11172: If the worker is in a container, use the container hostname
+      // to establish the connection.
+      if (!mWorkerNetAddress.getContainerHost().equals("")) {
+        dataSource = mWorkerNetAddress.getContainerHost();
+      }
+      List<CacheBlockInfo> pool = new LinkedList<>();
+      IntStream.range(0, mBatchSize).forEach(ignore -> {
+        CacheBlockInfo blockInfo = cacheBlockInfos.poll();
+        if (blockInfo != null) {
+          pool.add(blockInfo);
+        }
+      });
+
+      int finished = 0;
+      try (CloseableResource<BlockWorkerClient> blockWorker = mFsContext.acquireBlockWorkerClient(
+          mWorkerNetAddress)) {
+        finished = sendCachesRequestWithRetry(blockWorker, pool, dataSource);
+      } catch (Exception e) {
+        System.out.printf("Failed to complete cache request for the Worker %s: %n",
+            mWorkerNetAddress.toString());
+        e.printStackTrace();
+      } finally {
+        if (mDetail) {
+          System.out.printf("The worker%s loaded num: %d failed num: %d "
+                  + "total submit num: %d  total failed loaded num: %d%n",
+              mWorkerNetAddress.getHost(),
+              finished,
+              pool.size() - finished,
+              mWorksTasksCountMap.get(mWorkerNetAddress).intValue(),
+              mWorksFailedTasksCountMap.get(mWorkerNetAddress).intValue());
+        }
+        mWorksFailedTasksCountMap.get(mWorkerNetAddress).addAndGet(pool.size() - finished);
+        mActives.addAndGet(-pool.size());
+        pool.clear();
+      }
+    }
   }
 }

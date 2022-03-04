@@ -343,12 +343,7 @@ public interface BlockWorker extends Worker, SessionCleanable {
           .setSourceHost(request.getSourceHost())
           .setSourcePort(request.getSourcePort())
           .build();
-      try {
-        cache(cacheRequest);
-      } catch (Exception e) {
-        // log
-        throw e;
-      }
+      cache(cacheRequest);
     }
   }
 
