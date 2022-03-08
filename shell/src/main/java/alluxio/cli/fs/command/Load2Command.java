@@ -11,6 +11,8 @@
 
 package alluxio.cli.fs.command;
 
+import static alluxio.util.FormatUtils.getSizeFromBytes;
+
 import alluxio.AlluxioURI;
 import alluxio.annotation.PublicApi;
 import alluxio.cli.CommandUtils;
@@ -59,6 +61,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -105,17 +108,34 @@ public final class Load2Command extends AbstractFileSystemCommand {
           .argName("threads")
           .desc("threads num")
           .build();
-  private static final Option DETAIL =
-      Option.builder("detail")
-          .longOpt("detail")
+  private static final Option QUIET =
+      Option.builder("quiet")
+          .longOpt("quiet")
           .required(false)
           .hasArg(false)
-          .desc("print detail info")
+          .desc("Do not print detail task info")
           .build();
 
-  int mReTryTimes = 3;
+  private class TaskInfo {
+    private final AtomicLong mCount = new AtomicLong();
+    private final AtomicLong mLength = new AtomicLong();
+
+    public void add(long count, long length) {
+      mCount.addAndGet(count);
+      mLength.addAndGet(length);
+    }
+
+    public long getCount() {
+      return mCount.get();
+    }
+
+    public long getLength() {
+      return mLength.get();
+    }
+  }
+
   // Whether to output detailed information
-  boolean mDetail = false;
+  boolean mQuiet = false;
   int mBatchSize;
   // The maximum number of simultaneous tasks allowed by the cluster
   int mMaxActives;
@@ -126,8 +146,9 @@ public final class Load2Command extends AbstractFileSystemCommand {
   ExecutorService mExecutor;
   Map<WorkerNetAddress, LinkedBlockingQueue<CacheBlockInfo>> mWorkerCacheRequestsMap =
       new HashMap<>();
-  Map<WorkerNetAddress, AtomicInteger> mWorksTasksCountMap = new HashMap<>();
-  Map<WorkerNetAddress, AtomicInteger> mWorksFailedTasksCountMap = new HashMap<>();
+  Map<WorkerNetAddress, AtomicInteger> mWorksCommitTasksCountMap = new HashMap<>();
+  Map<WorkerNetAddress, TaskInfo> mWorksFailedTasksInfoMap = new HashMap<>();
+  Map<WorkerNetAddress, TaskInfo> mWorksCompletedTasksInfoMap = new HashMap<>();
 
   /**
    * Constructs a new instance to load a file or directory in Alluxio space.
@@ -150,7 +171,7 @@ public final class Load2Command extends AbstractFileSystemCommand {
         .addOption(BATCH_SIZE_OPTION)
         .addOption(THREADS)
         .addOption(MAX_ACTIVES)
-        .addOption(DETAIL);
+        .addOption(QUIET);
   }
 
   @Override
@@ -166,16 +187,24 @@ public final class Load2Command extends AbstractFileSystemCommand {
     }
     mBatchSize = FileSystemShellUtils.getIntArg(cl, BATCH_SIZE_OPTION, 50);
     mMaxActives = FileSystemShellUtils.getIntArg(cl, MAX_ACTIVES, 1000 * cachedWorkers.size());
-    mDetail = cl.hasOption(DETAIL.getLongOpt());
+    mQuiet = cl.hasOption(QUIET.getLongOpt());
 
     for (BlockWorkerInfo blockWorkerInfo: cachedWorkers) {
       mWorkerCacheRequestsMap.put(blockWorkerInfo.getNetAddress(), new LinkedBlockingQueue<>());
-      mWorksTasksCountMap.put(blockWorkerInfo.getNetAddress(), new AtomicInteger());
-      mWorksFailedTasksCountMap.put(blockWorkerInfo.getNetAddress(), new AtomicInteger());
+      mWorksCommitTasksCountMap.put(blockWorkerInfo.getNetAddress(), new AtomicInteger());
+      mWorksCompletedTasksInfoMap.put(blockWorkerInfo.getNetAddress(), new TaskInfo());
+      mWorksFailedTasksInfoMap.put(blockWorkerInfo.getNetAddress(), new TaskInfo());
     }
     int threadsNum = FileSystemShellUtils.getIntArg(cl, THREADS,
         Math.min(8 * Runtime.getRuntime().availableProcessors(), 4 * cachedWorkers.size()));
     mExecutor = Executors.newFixedThreadPool(threadsNum);
+
+    System.out.printf("Task parameter: %s: %s, %s: %s, %s: %s, %s: %s, %s: %s %n",
+        BATCH_SIZE_OPTION.getLongOpt(), mBatchSize,
+        THREADS.getLongOpt(), threadsNum,
+        MAX_ACTIVES.getLongOpt(), mMaxActives,
+        LOCAL_OPTION.getLongOpt(), cl.hasOption(LOCAL_OPTION.getLongOpt()),
+        QUIET.getLongOpt(), mQuiet);
   }
 
   @Override
@@ -184,24 +213,36 @@ public final class Load2Command extends AbstractFileSystemCommand {
     AlluxioURI path = new AlluxioURI(args[0]);
     init(cl);
     runWildCardCmd(path, cl);
-
-    int successfulLoad = 0;
-    int failedLoad = 0;
-    for (Map.Entry<WorkerNetAddress, AtomicInteger> entry : mWorksTasksCountMap.entrySet()) {
-      System.out.printf("%s\tloaded successfully: %s\tfailed : %s%n", entry.getKey().getHost(),
-          mWorksTasksCountMap.get(entry.getKey()).intValue(),
-          mWorksFailedTasksCountMap.get(entry.getKey()).intValue());
-      successfulLoad += mWorksTasksCountMap.get(entry.getKey()).intValue();
-      failedLoad += mWorksFailedTasksCountMap.get(entry.getKey()).intValue();
-    }
-    System.out.printf("Summarize: %n  loaded successfully sum : %s\tfailed : %s%n",
-        successfulLoad, failedLoad);
-
     mExecutor.shutdown();
     while (mExecutor.isTerminated()) {
       CommonUtils.sleepMs(10);
     }
+    outputResult();
     return 0;
+  }
+
+  private void outputResult() {
+    long completedCount = 0;
+    long completedLength = 0;
+    long failedLoad = 0;
+    long failedLength = 0;
+    for (Map.Entry<WorkerNetAddress, AtomicInteger> entry : mWorksCommitTasksCountMap.entrySet()) {
+      System.out.println("Summarize:");
+      System.out.print("  " + entry.getKey().getHost()
+          + "\tloaded successfully: " + mWorksCompletedTasksInfoMap.get(entry.getKey()).getCount()
+          + " size: "
+          + getSizeFromBytes(mWorksCompletedTasksInfoMap.get(entry.getKey()).getLength())
+          + "\tloaded failed: " + mWorksFailedTasksInfoMap.get(entry.getKey()).getCount()
+          + " size: " + getSizeFromBytes(mWorksFailedTasksInfoMap.get(entry.getKey()).getLength()));
+      System.out.println();
+      completedCount += mWorksCompletedTasksInfoMap.get(entry.getKey()).getCount();
+      completedLength += mWorksCompletedTasksInfoMap.get(entry.getKey()).getLength();
+      failedLoad += mWorksFailedTasksInfoMap.get(entry.getKey()).getCount();
+      failedLength += mWorksFailedTasksInfoMap.get(entry.getKey()).getLength();
+    }
+    System.out.printf("  All loaded successfully count: %s size: %s\tfailed count: %s size: %s%n",
+        completedCount, getSizeFromBytes(completedLength),
+        failedLoad, getSizeFromBytes(failedLength));
   }
 
   /**
@@ -233,9 +274,11 @@ public final class Load2Command extends AbstractFileSystemCommand {
             System.out.printf("%s%n", e);
             throw new RuntimeException(e);
           }
-        } else if (uriStatus.getInAlluxioPercentage() == 100) {
+        } else if (uriStatus.getInAlluxioPercentage() == 100 && uriStatus.getLength() != 0) {
           // The file has already been fully loaded into Alluxio.
-          System.out.println(uriStatus.getPath() + " already in Alluxio fully");
+          if (!mQuiet) {
+            System.out.println(uriStatus.getPath() + " already in Alluxio fully");
+          }
           return;
         }
         try {
@@ -309,8 +352,8 @@ public final class Load2Command extends AbstractFileSystemCommand {
     }
     mActives.incrementAndGet();
     mWorkerCacheRequestsMap.get(worker).add(blockInfo);
-    mWorksTasksCountMap.get(worker).incrementAndGet();
-    if (mWorksTasksCountMap.get(worker).get() % mBatchSize == 0) {
+    mWorksCommitTasksCountMap.get(worker).incrementAndGet();
+    if (mWorksCommitTasksCountMap.get(worker).get() % mBatchSize == 0) {
       submitBatchRequest(worker);
     }
   }
@@ -338,15 +381,16 @@ public final class Load2Command extends AbstractFileSystemCommand {
 
   public class CacheTask implements Runnable {
 
-    private WorkerNetAddress mWorkerNetAddress;
+    private final WorkerNetAddress mWorkerNetAddress;
 
     public CacheTask(WorkerNetAddress workerNetAddress) {
       mWorkerNetAddress = workerNetAddress;
     }
 
-    private int sendCachesRequestWithRetry(CloseableResource<BlockWorkerClient> blockWorker ,
+    private boolean sendCachesRequestWithRetry(CloseableResource<BlockWorkerClient> blockWorker ,
         List<CacheBlockInfo> pool, String dataSource) {
-      RetryPolicy retryPolicy = new CountingRetry(mReTryTimes);
+      int reTryTimes = 3;
+      RetryPolicy retryPolicy = new CountingRetry(reTryTimes);
       while (retryPolicy.attempt()) {
         CachesRequest cachesRequest =
             CachesRequest.newBuilder().addAllCacheBlockInfo(pool).setSourceHost(dataSource)
@@ -355,16 +399,16 @@ public final class Load2Command extends AbstractFileSystemCommand {
           blockWorker.get().caches(cachesRequest);
         } catch (Exception e) {
           System.out.printf("Failed to complete caches request for the Worker %s, "
-              + "Retry: %d%n", dataSource, retryPolicy.getAttemptCount());
+              + "AttemptCount: %d%n", dataSource, retryPolicy.getAttemptCount());
           e.printStackTrace();
+          if (retryPolicy.getAttemptCount() > reTryTimes) {
+            return false;
+          }
           continue;
         }
         break;
       }
-      if (retryPolicy.getAttemptCount() == mReTryTimes) {
-        return 0;
-      }
-      return pool.size();
+      return true;
     }
 
     @Override
@@ -378,32 +422,40 @@ public final class Load2Command extends AbstractFileSystemCommand {
         dataSource = mWorkerNetAddress.getContainerHost();
       }
       List<CacheBlockInfo> pool = new LinkedList<>();
+      final long[] taskLength = {0};
       IntStream.range(0, mBatchSize).forEach(ignore -> {
         CacheBlockInfo blockInfo = cacheBlockInfos.poll();
         if (blockInfo != null) {
+          taskLength[0] += blockInfo.getLength();
           pool.add(blockInfo);
         }
       });
 
-      int finished = 0;
+      boolean successfully = false;
       try (CloseableResource<BlockWorkerClient> blockWorker = mFsContext.acquireBlockWorkerClient(
           mWorkerNetAddress)) {
-        finished = sendCachesRequestWithRetry(blockWorker, pool, dataSource);
+        successfully = sendCachesRequestWithRetry(blockWorker, pool, dataSource);
       } catch (Exception e) {
         System.out.printf("Failed to complete cache request for the Worker %s: %n",
-            mWorkerNetAddress.toString());
+            mWorkerNetAddress.getHost());
         e.printStackTrace();
       } finally {
-        if (mDetail) {
-          System.out.printf("The worker%s loaded num: %d failed num: %d "
-                  + "total submit num: %d  total failed loaded num: %d%n",
-              mWorkerNetAddress.getHost(),
-              finished,
-              pool.size() - finished,
-              mWorksTasksCountMap.get(mWorkerNetAddress).intValue(),
-              mWorksFailedTasksCountMap.get(mWorkerNetAddress).intValue());
+        if (!mQuiet) {
+          System.out.print(mWorkerNetAddress.getHost()
+              + "  loaded successfully: "
+              + mWorksCompletedTasksInfoMap.get(mWorkerNetAddress).getCount()
+              + " size: "
+              + getSizeFromBytes(mWorksCompletedTasksInfoMap.get(mWorkerNetAddress).getLength())
+              + "  loaded failed: " + mWorksFailedTasksInfoMap.get(mWorkerNetAddress).getCount()
+              + " size :"
+              + getSizeFromBytes(mWorksFailedTasksInfoMap.get(mWorkerNetAddress).getLength()));
+          System.out.println();
         }
-        mWorksFailedTasksCountMap.get(mWorkerNetAddress).addAndGet(pool.size() - finished);
+        if (successfully) {
+          mWorksCompletedTasksInfoMap.get(mWorkerNetAddress).add(pool.size(), taskLength[0]);
+        } else {
+          mWorksFailedTasksInfoMap.get(mWorkerNetAddress).add(pool.size(), 0);
+        }
         mActives.addAndGet(-pool.size());
         pool.clear();
       }

@@ -18,13 +18,11 @@ import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.BlockAlreadyExistsException;
-import alluxio.exception.status.CancelledException;
+import alluxio.exception.status.AlreadyExistsException;
 import alluxio.grpc.CacheRequest;
 import alluxio.metrics.MetricKey;
 import alluxio.metrics.MetricsSystem;
 import alluxio.proto.dataserver.Protocol;
-import alluxio.util.CommonUtils;
-import alluxio.util.WaitForOptions;
 import alluxio.util.io.BufferUtils;
 import alluxio.util.logging.SamplingLogger;
 import alluxio.util.network.NetworkAddressUtils;
@@ -41,11 +39,8 @@ import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -84,79 +79,19 @@ public class CacheRequestManager {
   }
 
   /**
-   * Handles a request to cache a block. If it's async cache, it wouldn't throw exception.
+   * Handles a request to cache a block.
    *
    * @param request the cache request fields will be available
+   * @return the future corresponding to the cache task
    */
-  public void submitRequest(CacheRequest request)
-      throws AlluxioException, IOException {
+  public Future<Void> submitRequest(CacheRequest request)
+      throws AlreadyExistsException {
     CACHE_REQUESTS.inc();
     long blockId = request.getBlockId();
-    boolean async = request.getAsync();
     if (mActiveCacheRequests.putIfAbsent(blockId, request) != null) {
-      // This block is already planned and just just return.
-      if (async) {
-        LOG.debug("request already planned: {}", request);
-      } else {
-        try {
-          CommonUtils.waitFor("block to be loaded",
-              () -> !mActiveCacheRequests.containsKey(blockId),
-              WaitForOptions.defaults().setTimeoutMs(30 * Constants.SECOND_MS));
-        } catch (InterruptedException e) {
-          throw new CancelledException("Fail to finish cache request synchronously. "
-              + "Interrupted while waiting for block to be loaded by another request.", e);
-        } catch (TimeoutException e) {
-          throw new CancelledException("Fail to finish cache request synchronously due to timeout",
-              e);
-        }
-      }
-      return;
+      throw new AlreadyExistsException("blockId " + blockId + " cache task has been submitted.");
     }
-
-    if (!async) {
-      CACHE_REQUESTS_SYNC.inc();
-    } else {
-      CACHE_REQUESTS_ASYNC.inc();
-    }
-    Future<Void> future = null;
-    try {
-      future = mCacheExecutor.submit(new CacheTask(request));
-    } catch (RejectedExecutionException e) {
-      // RejectedExecutionException may be thrown in extreme cases when the
-      // gRPC thread pool is drained due to highly concurrent caching workloads. In these cases,
-      // return as async caching is at best effort.
-      mNumRejected.incrementAndGet();
-      SAMPLING_LOG.warn(String.format(
-          "Failed to cache block locally as the thread pool is at capacity."
-              + " To increase, update the parameter '%s'. numRejected: {} error: {}",
-          PropertyKey.Name.WORKER_NETWORK_ASYNC_CACHE_MANAGER_THREADS_MAX), mNumRejected.get(),
-          e.toString());
-      mActiveCacheRequests.remove(blockId);
-      if (!async) {
-        throw new CancelledException(String.format(
-            "Fail to finish cache request synchronously as the thread pool is at capacity."
-                + " To increase the capacity, set the parameter '%s' and '%s' higher. ",
-            PropertyKey.Name.WORKER_NETWORK_ASYNC_CACHE_MANAGER_THREADS_MAX,
-            PropertyKey.Name.WORKER_NETWORK_ASYNC_CACHE_MANAGER_QUEUE_MAX), e);
-      }
-    }
-    if (future != null && !async) {
-      try {
-        future.get();
-      } catch (ExecutionException e) {
-        CACHE_FAILED_BLOCKS.inc();
-        Throwable cause = e.getCause();
-        if (cause instanceof AlluxioException) {
-          throw new AlluxioException(cause.getMessage(), cause);
-        } else {
-          throw new IOException(cause);
-        }
-      } catch (InterruptedException e) {
-        throw new CancelledException(
-            "Fail to finish cache request synchronously. Interrupted while waiting for response.",
-            e);
-      }
-    }
+    return mCacheExecutor.submit(new CacheTask(request));
   }
 
   /**
@@ -332,10 +267,6 @@ public class CacheRequestManager {
   // Metrics
   private static final Counter CACHE_REQUESTS =
       MetricsSystem.counter(MetricKey.WORKER_CACHE_REQUESTS.getName());
-  private static final Counter CACHE_REQUESTS_ASYNC =
-      MetricsSystem.counter(MetricKey.WORKER_CACHE_REQUESTS_ASYNC.getName());
-  private static final Counter CACHE_REQUESTS_SYNC =
-      MetricsSystem.counter(MetricKey.WORKER_CACHE_REQUESTS_SYNC.getName());
   private static final Counter CACHE_FAILED_BLOCKS =
           MetricsSystem.counter(MetricKey.WORKER_CACHE_FAILED_BLOCKS.getName());
   private static final Counter CACHE_REMOTE_BLOCKS =

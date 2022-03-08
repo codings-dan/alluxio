@@ -170,7 +170,7 @@ public class BlockWorkerClientServiceHandler extends BlockWorkerGrpc.BlockWorker
   @Override
   public void caches(CachesRequest request, StreamObserver<CachesResponse> responseObserver) {
     RpcUtils.call(LOG, () -> {
-      mBlockWorker.caches(request);
+      mBlockWorker.parallelCaches(request);
       return CachesResponse.getDefaultInstance();
     }, "cache", "request=%s", responseObserver, request);
   }

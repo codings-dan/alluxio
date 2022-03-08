@@ -17,7 +17,6 @@ import alluxio.exception.BlockDoesNotExistException;
 import alluxio.exception.InvalidWorkerStateException;
 import alluxio.exception.WorkerOutOfSpaceException;
 import alluxio.grpc.AsyncCacheRequest;
-import alluxio.grpc.CacheBlockInfo;
 import alluxio.grpc.CacheRequest;
 import alluxio.grpc.CachesRequest;
 import alluxio.grpc.GetConfigurationPOptions;
@@ -329,23 +328,11 @@ public interface BlockWorker extends Worker, SessionCleanable {
   void cache(CacheRequest request) throws AlluxioException, IOException;
 
   /**
-   * Submits the cache request list to cache manager to execute.
+   * Parallel submits the cache request list to cache manager to execute.
    *
    * @param request the cache request list
    */
-  default void caches(CachesRequest request) throws AlluxioException, IOException {
-    for (CacheBlockInfo blockInfo: request.getCacheBlockInfoList()) {
-      CacheRequest cacheRequest = CacheRequest.newBuilder()
-          .setBlockId(blockInfo.getBlockId())
-          .setOpenUfsBlockOptions(blockInfo.getOpenUfsBlockOptions())
-          .setLength(blockInfo.getLength())
-          .setAsync(request.getAsync())
-          .setSourceHost(request.getSourceHost())
-          .setSourcePort(request.getSourcePort())
-          .build();
-      cache(cacheRequest);
-    }
-  }
+  void parallelCaches(CachesRequest request) throws AlluxioException, IOException;
 
   /**
    * Sets the pinlist for the underlying block store.

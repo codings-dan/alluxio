@@ -30,9 +30,13 @@ import alluxio.exception.BlockDoesNotExistException;
 import alluxio.exception.ExceptionMessage;
 import alluxio.exception.InvalidWorkerStateException;
 import alluxio.exception.WorkerOutOfSpaceException;
+import alluxio.exception.status.AlreadyExistsException;
+import alluxio.exception.status.CancelledException;
 import alluxio.exception.status.UnavailableException;
 import alluxio.grpc.AsyncCacheRequest;
+import alluxio.grpc.CacheBlockInfo;
 import alluxio.grpc.CacheRequest;
+import alluxio.grpc.CachesRequest;
 import alluxio.grpc.GetConfigurationPOptions;
 import alluxio.grpc.GrpcService;
 import alluxio.grpc.ServiceType;
@@ -76,9 +80,12 @@ import java.net.InetSocketAddress;
 import java.nio.channels.FileChannel;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
@@ -564,6 +571,7 @@ public class DefaultBlockWorker extends AbstractWorker implements BlockWorker {
 
   @Override
   public void asyncCache(AsyncCacheRequest request) {
+    Metrics.CACHE_REQUESTS_ASYNC.inc();
     CacheRequest cacheRequest =
         CacheRequest.newBuilder().setBlockId(request.getBlockId()).setLength(request.getLength())
             .setOpenUfsBlockOptions(request.getOpenUfsBlockOptions())
@@ -576,9 +584,57 @@ public class DefaultBlockWorker extends AbstractWorker implements BlockWorker {
     }
   }
 
+  private void waitForCache(Future<Void> future) throws AlluxioException, IOException {
+    try {
+      future.get();
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof AlluxioException) {
+        throw new AlluxioException(cause.getMessage(), cause);
+      } else {
+        throw new IOException(cause);
+      }
+    } catch (InterruptedException e) {
+      throw new CancelledException(
+          "Fail to finish cache request synchronously. Interrupted while waiting for response.", e);
+    }
+  }
+
   @Override
   public void cache(CacheRequest request) throws AlluxioException, IOException {
-    mCacheManager.submitRequest(request);
+    Future<Void> future;
+    Metrics.CACHE_REQUESTS_SYNC.inc();
+    future = mCacheManager.submitRequest(request);
+    waitForCache(future);
+  }
+
+  @Override
+  public void parallelCaches(CachesRequest request) throws AlluxioException, IOException {
+    List<Future<Void>> futures = new LinkedList<>();
+    Future<Void> future;
+
+    for (CacheBlockInfo blockInfo: request.getCacheBlockInfoList()) {
+      CacheRequest cacheRequest = CacheRequest.newBuilder()
+          .setBlockId(blockInfo.getBlockId())
+          .setOpenUfsBlockOptions(blockInfo.getOpenUfsBlockOptions())
+          .setLength(blockInfo.getLength())
+          .setAsync(request.getAsync())
+          .setSourceHost(request.getSourceHost())
+          .setSourcePort(request.getSourcePort())
+          .build();
+      try {
+        Metrics.CACHE_REQUESTS_SYNC.inc();
+        future = mCacheManager.submitRequest(cacheRequest);
+      } catch (AlreadyExistsException e) {
+        LOG.debug("cache: ", e);
+        continue;
+      }
+      futures.add(future);
+    }
+
+    for (Future<Void> f : futures) {
+      waitForCache(f);
+    }
   }
 
   @Override
@@ -747,6 +803,10 @@ public class DefaultBlockWorker extends AbstractWorker implements BlockWorker {
   public static final class Metrics {
     private static final Counter WORKER_ACTIVE_CLIENTS =
         MetricsSystem.counter(MetricKey.WORKER_ACTIVE_CLIENTS.getName());
+    private static final Counter CACHE_REQUESTS_ASYNC =
+        MetricsSystem.counter(MetricKey.WORKER_CACHE_REQUESTS_ASYNC.getName());
+    private static final Counter CACHE_REQUESTS_SYNC =
+        MetricsSystem.counter(MetricKey.WORKER_CACHE_REQUESTS_SYNC.getName());
 
     /**
      * Registers metric gauges.
