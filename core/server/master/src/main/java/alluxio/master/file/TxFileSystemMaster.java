@@ -121,7 +121,7 @@ public final class TxFileSystemMaster extends DefaultFileSystemMaster {
                        currInodePath.getLockPattern())) {
             try (LockedInodePath childInodePath =
                      tmp.lockChild(child, InodeTree.LockPattern.READ, childComponentsHint)) {
-              listStatusInternal(context, rpcContext, childInodePath, auditContext,
+              super.listStatusInternal(context, rpcContext, childInodePath, auditContext,
                   nextDescendantType, resultStream, depth + 1, counter);
               return true;
             }
