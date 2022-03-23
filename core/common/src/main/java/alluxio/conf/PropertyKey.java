@@ -66,6 +66,11 @@ public final class PropertyKey implements Comparable<PropertyKey> {
       .maximumSize(1024)
       .build();
 
+  static {
+    LOG.debug("MASTER_SHIMFS_AUTO_MOUNT_ENABLED:{}",
+        TxPropertyKey.MASTER_SHIMFS_AUTO_MOUNT_ENABLED);
+  }
+
   /**
    * The consistency check level to apply to a certain property key.
    * User can run "alluxio validateEnv all cluster.conf.consistent" to validate the consistency of
