@@ -11,9 +11,6 @@
 
 package alluxio.hadoop;
 
-import alluxio.Constants;
-import alluxio.conf.PropertyKey;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.DelegateToFileSystem;
 
@@ -47,11 +44,15 @@ public class AlluxioShimFileSystem extends DelegateToFileSystem {
    */
   AlluxioShimFileSystem(final URI uri, final Configuration conf)
       throws IOException, URISyntaxException {
-    super(uri, new ShimFileSystem(), conf, Constants.NO_SCHEME, false);
+    super(uri, new ShimFileSystem(), conf, uri.getScheme(), false);
   }
 
   @Override
   public int getUriDefaultPort() {
-    return Integer.parseInt(PropertyKey.MASTER_RPC_PORT.getDefaultValue());
+    return getUri().getPort();
+  }
+
+  public void checkScheme(URI uri, String supportedScheme) {
+    // keep empty check.
   }
 }

@@ -25,6 +25,7 @@ import alluxio.grpc.DeletePOptions;
 import alluxio.util.io.PathUtils;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
@@ -77,6 +78,10 @@ public class ShimFileSystem extends AbstractFileSystem {
 
   private boolean mAlluxioFsHadInited = false;
 
+  private boolean mTransparentEnabled;
+
+  private TransparentRefreshThread mThread = null;
+
   /**
    * Constructs a new {@link ShimFileSystem}.
    */
@@ -123,7 +128,8 @@ public class ShimFileSystem extends AbstractFileSystem {
             mAlluxioConf.get(TxPropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST)), e);
       }
     }
-    if (!mByPassedPrefixSet.isEmpty() || mFallbackEnabled) {
+    mTransparentEnabled = mAlluxioConf.getBoolean(TxPropertyKey.USER_SHIMFS_TRANSPARENT_ENABLED);
+    if (!mByPassedPrefixSet.isEmpty() || mFallbackEnabled || mTransparentEnabled) {
       try {
         Class<? extends org.apache.hadoop.fs.FileSystem> clazz =
             org.apache.hadoop.fs.FileSystem.getFileSystemClass(uri.getScheme(),
@@ -146,6 +152,13 @@ public class ShimFileSystem extends AbstractFileSystem {
             String.format("Failed to initialize bypass fs for scheme: %s.", uri.getScheme()), e);
       }
     }
+    long mountTblRefMS = mAlluxioConf.getMs(TxPropertyKey.USER_SHIMFS_REFRESH_MOUNT_TABLE_CACHE);
+    Preconditions.checkArgument(mountTblRefMS > 0,
+        String.format("Property %s must greater than zero",
+            TxPropertyKey.USER_SHIMFS_REFRESH_MOUNT_TABLE_CACHE.getName()));
+    mThread = new TransparentRefreshThread(mFileSystem, mountTblRefMS);
+    mThread.setDaemon(true);
+    mThread.start();
   }
 
   private Configuration getByPassFsImplConf(AlluxioConfiguration alluxioConf) throws IOException {
@@ -252,9 +265,13 @@ public class ShimFileSystem extends AbstractFileSystem {
       LOG.debug("AlluxioFileSystem had not be inited, will pass for path:{}", path);
       return true;
     }
-
+    String alluxioPath = getAlluxioPath(path).toString();
+    boolean needTransparent = false;
+    if (mTransparentEnabled) {
+      needTransparent = mThread.checkUriNeedTransparent(alluxioPath);
+    }
     if (mByPassedPrefixSet.isEmpty()) {
-      return false;
+      return needTransparent;
     }
     URI pathUri = path.toUri();
     for (URI prefixUri : mByPassedPrefixSet) {
@@ -273,7 +290,7 @@ public class ShimFileSystem extends AbstractFileSystem {
             String.format("Failed to check path against by-pass prefixes. Path: %s", path), e);
       }
     }
-    return false;
+    return needTransparent;
   }
 
   @Override
@@ -572,6 +589,14 @@ public class ShimFileSystem extends AbstractFileSystem {
     if (mByPassFs != null) {
       mByPassFs.close();
     }
+    if (mThread != null) {
+      mThread.shutdown();
+      try {
+        mThread.join();
+      } catch (InterruptedException e) {
+        LOG.error("Wait TransparentRefreshThread was interrupted", e);
+      }
+    }
     super.close();
   }
 
@@ -582,5 +607,9 @@ public class ShimFileSystem extends AbstractFileSystem {
       return new Path(uri.getScheme(), uri.getAuthority(), pathUri.getPath());
     }
     return path;
+  }
+
+  public int getUriDefaultPort() {
+    return getUri().getPort();
   }
 }

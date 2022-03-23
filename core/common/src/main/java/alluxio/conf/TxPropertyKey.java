@@ -168,6 +168,20 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
+  public static final PropertyKey USER_SHIMFS_TRANSPARENT_ENABLED =
+      new Builder(Name.USER_SHIMFS_TRANSPARENT_ENABLED)
+          .setDescription("If true, ufs can be transparent to storage directly.")
+          .setDefaultValue(Boolean.valueOf(false))
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.CLIENT)
+          .build();
+  public static final PropertyKey USER_SHIMFS_REFRESH_MOUNT_TABLE_CACHE =
+      new Builder(Name.USER_SHIMFS_REFRESH_MOUNT_TABLE_CACHE)
+          .setDefaultValue("20sec")
+          .setDescription("Alluxio refresh mount table cache")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.CLIENT)
+          .build();
   public static final PropertyKey MASTER_URI_TRANSLATOR_IMPL =
       new Builder(Name.MASTER_URI_TRANSLATOR_IMPL)
           .setDefaultValue("alluxio.master.file.uritranslator.DefaultUriTranslator")
@@ -445,6 +459,10 @@ public final class TxPropertyKey {
         "alluxio.user.shimfs.bypass.prefix.list";
     public static final String USER_SHIMFS_BYPASS_UFS_IMPL_LIST =
         "alluxio.user.shimfs.bypass.ufs.impl.list";
+    public static final String USER_SHIMFS_TRANSPARENT_ENABLED =
+        "alluxio.user.shimfs.transparent.enabled";
+    public static final String USER_SHIMFS_REFRESH_MOUNT_TABLE_CACHE =
+        "alluxio.user.shimfs.refresh.mount.table.cache";
 
     // Shimfs extended properties
     public static final String MASTER_URI_TRANSLATOR_IMPL =
