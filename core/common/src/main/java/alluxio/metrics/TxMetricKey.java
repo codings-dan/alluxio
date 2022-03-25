@@ -27,6 +27,11 @@ public class TxMetricKey {
           .setDescription("Count of blocks to remove")
           .setMetricType(MetricType.GAUGE)
           .build();
+  public static final MetricKey MASTER_BLOCK_LOCATIONS_COUNT =
+      new MetricKey.Builder("Master.BlockLocationCount")
+          .setDescription("Count of blocks location")
+          .setMetricType(MetricType.GAUGE)
+          .build();
 
   // Cluster metrics
   public static final MetricKey CLUSTER_METADATA_CACHE_REFRESH_COUNT =

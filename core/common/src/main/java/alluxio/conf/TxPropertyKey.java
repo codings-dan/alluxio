@@ -108,6 +108,17 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
+  public static final PropertyKey MASTER_METASTORE_BLOCK =
+      new Builder(Name.MASTER_METASTORE_BLOCK)
+          .setDefaultValue(String.format("${%s}", PropertyKey.Name.MASTER_METASTORE))
+          .setDescription("The type of metastore to use, either HEAP or ROCKS. The heap metastore "
+              + "keeps all metadata on-heap, while the rocks metastore stores some metadata on "
+              + "heap and some metadata on disk. The rocks metastore has the advantage of being "
+              + "able to support a large namespace (1 billion plus files) without needing a "
+              + "massive heap size.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
 
   //
   // Shimfs  related properties
@@ -403,6 +414,7 @@ public final class TxPropertyKey {
         "alluxio.master.list.status.executor.pool.size";
     public static final String MASTER_SLOW_LIST_OPERATION_THRESHOLD =
         "alluxio.master.slow.list.operation.threshold";
+    public static final String MASTER_METASTORE_BLOCK = "alluxio.master.metastore.block";
 
     public static final String MASTER_METASTORE_BLOCK_STORE_DIR =
         "alluxio.master.metastore.block.store.dir";
