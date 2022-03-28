@@ -28,6 +28,7 @@ var (
 	customUfsModuleFlag string
 	skipUIFlag          bool
 	skipHelmFlag        bool
+	ratisShellSrc       string
 )
 
 func Single(args []string) error {
@@ -40,8 +41,9 @@ func Single(args []string) error {
 	singleCmd.BoolVar(&skipUIFlag, "skip-ui", false, fmt.Sprintf("set this flag to skip building the webui. This will speed up the build times "+
 		"but the generated tarball will have no Alluxio WebUI although REST services will still be available."))
 	singleCmd.BoolVar(&skipHelmFlag, "skip-helm", true, fmt.Sprintf("set this flag to skip using Helm to generate YAML templates for K8s deployment scenarios"))
+	singleCmd.StringVar(&ratisShellSrc, "ratis-shell-src", "", "a path to get ratis-shell.tar.gz")
 	singleCmd.StringVar(&authModulesFlag, "auth-modules", strings.Join(defaultModules(authModules), ","),
-    fmt.Sprintf("a comma-separated list of authorization modules to compile into the distribution tarball(s). Specify 'all' to build all authorization modules. Supported authorization modules: [%v]", strings.Join(validModules(authModules), ",")))
+		fmt.Sprintf("a comma-separated list of authorization modules to compile into the distribution tarball(s). Specify 'all' to build all authorization modules. Supported authorization modules: [%v]", strings.Join(validModules(authModules), ",")))
 
 	singleCmd.Parse(args[2:]) // error handling by flag.ExitOnError
 
@@ -321,6 +323,14 @@ func generateTarball(skipUI, skipHelm bool) error {
 	// Generate Helm templates in the dstPath
 	run("adding Helm chart", "cp", "-r", filepath.Join(srcPath, "integration/kubernetes/helm-chart"), filepath.Join(dstPath, "integration/kubernetes/helm-chart"))
 	run("adding YAML generator script", "cp", filepath.Join(srcPath, "integration/kubernetes/helm-generate.sh"), filepath.Join(dstPath, "integration/kubernetes/helm-generate.sh"))
+
+	if ratisShellSrc != "" {
+		run("adding ratis-shell module", "wget", "-q", ratisShellSrc, "-O", filepath.Join(dstPath, "ratis-shell.tar.gz"))
+		run("createing ratis-shell dir", "mkdir", filepath.Join(dstPath, "ratis-shell"))
+		run("decompressing the ratis-shell", "tar", "-zxf", filepath.Join(dstPath, "ratis-shell.tar.gz"), "-C", filepath.Join(dstPath, "ratis-shell"), "--strip-component", "1")
+		run("deleting extra document", "rm", filepath.Join(dstPath, "ratis-shell.tar.gz"))
+	}
+
 	if !skipHelm {
 		chdir(filepath.Join(dstPath, "integration/kubernetes/"))
 		run("generate Helm templates", "bash", "helm-generate.sh", "all")
