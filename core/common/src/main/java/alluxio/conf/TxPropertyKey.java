@@ -141,6 +141,13 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
+  public static final PropertyKey MASTER_SHIMFS_AUTO_MOUNT_OPTION =
+      new Builder(Name.MASTER_SHIMFS_AUTO_MOUNT_OPTION)
+          .setDefaultValue("")
+          .setDescription("Configuration for the auto mount.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.MASTER)
+          .build();
   public static final PropertyKey USER_SHIMFS_BYPASS_PREFIX_LIST =
       new Builder(Name.USER_SHIMFS_BYPASS_PREFIX_LIST)
           .setDescription("A comma-separated list of prefix paths to by-pass. "
@@ -432,6 +439,8 @@ public final class TxPropertyKey {
         "alluxio.master.shimfs.auto.mount.readonly";
     public static final String MASTER_SHIMFS_AUTO_MOUNT_SHARED =
         "alluxio.master.shimfs.auto.mount.shared";
+    public static final String MASTER_SHIMFS_AUTO_MOUNT_OPTION =
+        "alluxio.master.shimfs.auto.mount.option";
     public static final String USER_SHIMFS_BYPASS_PREFIX_LIST =
         "alluxio.user.shimfs.bypass.prefix.list";
     public static final String USER_SHIMFS_BYPASS_UFS_IMPL_LIST =

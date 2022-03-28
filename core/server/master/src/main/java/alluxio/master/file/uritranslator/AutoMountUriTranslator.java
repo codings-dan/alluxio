@@ -34,6 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Map;
 
 /**
  * Auto mount if the resolve unsuccessfully.
@@ -122,6 +123,8 @@ public class AutoMountUriTranslator implements UriTranslator {
         ServerConfiguration.getBoolean(TxPropertyKey.MASTER_SHIMFS_AUTO_MOUNT_READONLY);
     boolean mountShared =
         ServerConfiguration.getBoolean(TxPropertyKey.MASTER_SHIMFS_AUTO_MOUNT_SHARED);
+    Map<String, String> mountConf =
+        ServerConfiguration.getNestedProperties(TxPropertyKey.MASTER_SHIMFS_AUTO_MOUNT_OPTION);
     // Try mounting UFS to Alluxio starting from the ufs root.
     int pathComponentIndex = 0;
     String currentPathComponent;
@@ -130,7 +133,8 @@ public class AutoMountUriTranslator implements UriTranslator {
     AlluxioURI firstCreatedParent = null;
     try {
       MountContext mountCtx = MountContext
-          .mergeFrom(MountPOptions.newBuilder().setReadOnly(mountReadonly).setShared(mountShared));
+          .mergeFrom(MountPOptions.newBuilder().setReadOnly(mountReadonly)
+              .setShared(mountShared).putAllProperties(mountConf));
       while ((currentPathComponent = ufsUri.getLeadingPath(pathComponentIndex++)) != null) {
         // Generate current Alluxio mount root.
         AlluxioURI currentAlluxioRootUri =
