@@ -329,6 +329,7 @@ func generateTarball(skipUI, skipHelm bool) error {
 		run("createing ratis-shell dir", "mkdir", filepath.Join(dstPath, "ratis-shell"))
 		run("decompressing the ratis-shell", "tar", "-zxf", filepath.Join(dstPath, "ratis-shell.tar.gz"), "-C", filepath.Join(dstPath, "ratis-shell"), "--strip-component", "1")
 		run("deleting extra document", "rm", filepath.Join(dstPath, "ratis-shell.tar.gz"))
+		run("createing sysmbolic", "ln", "-s", filepath.Join(dstPath, "ratis-shell/bin/ratis"), filepath.Join(dstPath, "bin/ratis"))
 	}
 
 	if !skipHelm {
