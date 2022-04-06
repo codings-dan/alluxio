@@ -12,6 +12,7 @@
 package alluxio.client.block.stream;
 
 import alluxio.conf.AlluxioConfiguration;
+import alluxio.exception.status.UnavailableException;
 import alluxio.grpc.CacheRequest;
 import alluxio.grpc.CachesRequest;
 import alluxio.grpc.ClearMetricsRequest;
@@ -58,6 +59,8 @@ public interface BlockWorkerClient extends Closeable {
         throws IOException {
       try {
         return new DefaultBlockWorkerClient(userState, address, alluxioConf);
+      } catch (UnavailableException e) {
+        throw e;
       } catch (Exception e) {
         throw new IOException(
             String.format("Failed to connect to block worker (%s)", address), e);
