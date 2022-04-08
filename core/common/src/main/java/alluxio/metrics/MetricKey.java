@@ -284,23 +284,6 @@ public final class MetricKey implements Comparable<MetricKey> {
               + "from (parentId, childName) to childId.")
           .setMetricType(MetricType.GAUGE)
           .build();
-  public static final MetricKey MASTER_EDGE_CACHE_ID_TO_CHILD_SIZE =
-      new Builder("Master.EdgeCacheIDToChildSize")
-          .setDescription("Total number of edges idToChild cached. ")
-          .setMetricType(MetricType.GAUGE)
-          .build();
-
-  public static final MetricKey MASTER_EDGE_CACHE_UNFLUSHED_DELETES_SIZE =
-      new Builder("Master.EdgeCacheUnflushedDeletesSize")
-          .setDescription("Total number of edges unflushed deletes cached. ")
-          .setMetricType(MetricType.GAUGE)
-          .build();
-
-  public static final MetricKey MASTER_BLOCK_LOCATIONS_SIZE =
-      new Builder("Master.BlockLocationsSize")
-          .setDescription("Total number of blockLocations. ")
-          .setMetricType(MetricType.GAUGE)
-          .build();
 
   // Master file statistics
   public static final MetricKey MASTER_FILES_PINNED =
@@ -996,11 +979,6 @@ public final class MetricKey implements Comparable<MetricKey> {
   public static final MetricKey CLUSTER_CAPACITY_FREE =
       new Builder("Cluster.CapacityFree")
           .setDescription("Total free bytes on all tiers, on all workers of Alluxio")
-          .setMetricType(MetricType.GAUGE)
-          .build();
-  public static final MetricKey CLUSTER_BLOCK_SIZE =
-      new Builder("Cluster.BlockSize")
-          .setDescription("Total block size on all workers of Alluxio")
           .setMetricType(MetricType.GAUGE)
           .build();
   public static final MetricKey CLUSTER_ROOT_UFS_CAPACITY_TOTAL =

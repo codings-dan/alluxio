@@ -126,7 +126,6 @@ import alluxio.master.journal.checkpoint.CheckpointName;
 import alluxio.master.metastore.DelegatingReadOnlyInodeStore;
 import alluxio.master.metastore.InodeStore;
 import alluxio.master.metastore.ReadOnlyInodeStore;
-import alluxio.master.metastore.caching.CachingInodeStore;
 import alluxio.master.metrics.TimeSeriesStore;
 import alluxio.metrics.Metric;
 import alluxio.metrics.MetricInfo;
@@ -366,8 +365,6 @@ public class DefaultFileSystemMaster extends CoreMaster
   /** This manages the file system inode structure. This must be journaled. */
   private final InodeTree mInodeTree;
 
-  private final InodeStore mInternalInodeStore;
-
   /** Store for holding inodes. */
   private final ReadOnlyInodeStore mInodeStore;
 
@@ -494,7 +491,7 @@ public class DefaultFileSystemMaster extends CoreMaster
     mInodeStore = new DelegatingReadOnlyInodeStore(inodeStore);
     mInodeTree = new InodeTree(inodeStore, mBlockMaster,
         mDirectoryIdGenerator, mMountTable, mInodeLockManager);
-    mInternalInodeStore = inodeStore;
+
     // TODO(gene): Handle default config value for whitelist.
     mWhitelist = new PrefixList(ServerConfiguration.getList(PropertyKey.MASTER_WHITELIST, ","));
     mPersistBlacklist = ServerConfiguration.isSet(PropertyKey.MASTER_PERSISTENCE_BLACKLIST)
@@ -5103,18 +5100,6 @@ public class DefaultFileSystemMaster extends CoreMaster
     @Override
     public void close() {
       // Nothing to clean up
-    }
-  }
-
-  public void setInodeReadSkipCache(boolean skipCache) {
-    if (mInternalInodeStore instanceof CachingInodeStore) {
-      ((CachingInodeStore) mInternalInodeStore).setInodeReadSkipCache(skipCache);
-    }
-  }
-
-  public void setEdgeReadSkipCache(boolean skipCache) {
-    if (mInternalInodeStore instanceof CachingInodeStore) {
-      ((CachingInodeStore) mInternalInodeStore).setEdgeReadSkipCache(skipCache);
     }
   }
 }

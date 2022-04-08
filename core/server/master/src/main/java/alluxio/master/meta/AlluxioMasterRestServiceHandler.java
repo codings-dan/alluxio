@@ -161,9 +161,6 @@ public final class AlluxioMasterRestServiceHandler {
   public static final String LOG_ARGUMENT_NAME = "logName";
   public static final String LOG_ARGUMENT_LEVEL = "level";
 
-  //inodeStore cache switch
-  public static final String INODE_STORE_CACHE_SWITCH = "inodeStoreCacheSwitch";
-
   private final AlluxioMasterProcess mMasterProcess;
   private final BlockMaster mBlockMaster;
   private final FileSystemMaster mFileSystemMaster;
@@ -1227,29 +1224,5 @@ public final class AlluxioMasterRestServiceHandler {
   public Response logLevel(@QueryParam(LOG_ARGUMENT_NAME) final String logName,
       @QueryParam(LOG_ARGUMENT_LEVEL) final String level) {
     return RestUtils.call(() -> LogUtils.setLogLevel(logName, level), ServerConfiguration.global());
-  }
-
-  @GET
-  @Path(INODE_STORE_CACHE_SWITCH)
-  public Response inodeStoreCacheSwitch(@QueryParam("type") final String type,
-                                        @QueryParam("operation") final Boolean operation) {
-    // TODO(jiri): Add a mechanism for retrieving only a subset of the fields.
-    return RestUtils.call(() -> {
-      if ("inode".equals(type)) {
-        if (mFileSystemMaster instanceof DefaultFileSystemMaster) {
-          ((DefaultFileSystemMaster) mFileSystemMaster).setInodeReadSkipCache(operation);
-          return "success";
-        }
-        return "fail";
-      } else if ("edge".equals(type)) {
-        if (mFileSystemMaster instanceof DefaultFileSystemMaster) {
-          ((DefaultFileSystemMaster) mFileSystemMaster).setEdgeReadSkipCache(operation);
-          return "success";
-        }
-        return "fail";
-      } else {
-        return "fail:can not config type " + type;
-      }
-    }, ServerConfiguration.global());
   }
 }

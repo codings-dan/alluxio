@@ -230,12 +230,12 @@ public class CachingInodeStoreMockedBackingStoreTest {
               Long.toString(random.nextLong(10, 15)));
         }
         operations.incrementAndGet();
-        assertTrue(mStore.mEdgeCache.mBaseCache.mMap.size() <= CACHE_SIZE + numThreads);
+        assertTrue(mStore.mEdgeCache.mMap.size() <= CACHE_SIZE + numThreads);
       }
       return null;
     }));
     alluxio.util.CommonUtils.waitFor("eviction thread to finish",
-        () -> mStore.mEdgeCache.mBaseCache.mEvictionThread.mIsSleeping);
+        () -> mStore.mEdgeCache.mEvictionThread.mIsSleeping);
     mStore.mEdgeCache.verifyIndices();
   }
 
