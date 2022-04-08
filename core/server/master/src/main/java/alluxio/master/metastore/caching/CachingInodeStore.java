@@ -18,6 +18,7 @@ import alluxio.concurrent.LockMode;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.master.file.meta.CacheEvictType;
 import alluxio.master.file.meta.Edge;
 import alluxio.master.file.meta.EdgeEntry;
 import alluxio.master.file.meta.Inode;
@@ -145,16 +146,18 @@ public final class CachingInodeStore implements InodeStore, Closeable {
         .setHighWaterMark(highWaterMark).setLowWaterMark(lowWaterMark)
         .setEvictBatchSize(conf.getInt(PropertyKey.MASTER_METASTORE_INODE_CACHE_EVICT_BATCH_SIZE))
         .build();
-    mInodeCache = new InodeCache(cacheConf);
-    mEdgeCache = new EdgeCache(cacheConf);
+    String cacheType = conf.get(PropertyKey.MASTER_METASTORE_CACHE_TYPE);
+    CacheEvictType cacheEvictType = CacheEvictType.valueOf(cacheType);
+    mInodeCache = new InodeCache(cacheConf, cacheEvictType);
+    mEdgeCache = new EdgeCache(cacheConf, cacheEvictType);
     mListingCache = new ListingCache(cacheConf);
     if (conf.getBoolean(PropertyKey.MASTER_METRICS_HEAP_ENABLED)) {
       MetricsSystem.registerCachedGaugeIfAbsent(MetricKey.MASTER_INODE_HEAP_SIZE.getName(),
           () -> {
             try {
-              return ObjectSizeCalculator.getObjectSize(mInodeCache.mMap,
+              return ObjectSizeCalculator.getObjectSize(mInodeCache.mBaseCache.mMap,
                   ImmutableSet.of(Long.class, MutableInodeFile.class, MutableInodeDirectory.class))
-                  + ObjectSizeCalculator.getObjectSize(mEdgeCache.mMap,
+                  + ObjectSizeCalculator.getObjectSize(mEdgeCache.mBaseCache.mMap,
                   ImmutableSet.of(Long.class, Edge.class))
                   + ObjectSizeCalculator.getObjectSize(mListingCache.mMap,
                   ImmutableSet.of(Long.class, ListingCache.ListingCacheEntry.class));
@@ -243,6 +246,14 @@ public final class CachingInodeStore implements InodeStore, Closeable {
     return mInodeCache.allInodes();
   }
 
+  public void setInodeReadSkipCache(boolean skipCache) {
+    mInodeCache.setSkipCache(skipCache);
+  }
+
+  public void setEdgeReadSkipCache(boolean skipCache) {
+    mEdgeCache.setSkipCache(skipCache);
+  }
+
   @Override
   public void close() {
     Closer closer = Closer.create();
@@ -290,10 +301,10 @@ public final class CachingInodeStore implements InodeStore, Closeable {
    */
   @VisibleForTesting
   class InodeCache extends Cache<Long, MutableInode<?>> {
-    public InodeCache(CacheConfiguration conf) {
+    public InodeCache(CacheConfiguration conf, CacheEvictType cacheEvictType) {
       super(conf, "inode-cache", MetricKey.MASTER_INODE_CACHE_EVICTIONS,
           MetricKey.MASTER_INODE_CACHE_HITS, MetricKey.MASTER_INODE_CACHE_LOAD_TIMES,
-          MetricKey.MASTER_INODE_CACHE_MISSES, MetricKey.MASTER_INODE_CACHE_SIZE);
+          MetricKey.MASTER_INODE_CACHE_MISSES, MetricKey.MASTER_INODE_CACHE_SIZE, cacheEvictType);
     }
 
     @Override
@@ -323,7 +334,7 @@ public final class CachingInodeStore implements InodeStore, Closeable {
       boolean useBatch = entries.size() > 0 && mBackingStore.supportsBatchWrite();
       try (WriteBatch batch = useBatch ? mBackingStore.createWriteBatch() : null) {
         for (Entry entry : entries) {
-          Long inodeId = entry.mKey;
+          Long inodeId = (Long) entry.mKey;
           Optional<RWLockResource> lockOpt = mLockManager.tryLockInode(inodeId, LockMode.WRITE);
           if (!lockOpt.isPresent()) {
             continue;
@@ -337,9 +348,9 @@ public final class CachingInodeStore implements InodeStore, Closeable {
               }
             } else {
               if (useBatch) {
-                batch.writeInode(entry.mValue);
+                batch.writeInode((MutableInode<?>) entry.mValue);
               } else {
-                mBackingStore.writeInode(entry.mValue);
+                mBackingStore.writeInode((MutableInode<?>) entry.mValue);
               }
             }
             entry.mDirty = false;
@@ -353,9 +364,10 @@ public final class CachingInodeStore implements InodeStore, Closeable {
 
     private Set<MutableInode<?>> allInodes() {
       Set<MutableInode<?>> cached = mInodeCache.getCacheMap().values().stream()
-          .filter(entry -> entry.mValue != null).map(entry -> entry.mValue).collect(toSet());
+          .filter(entry -> entry.mValue != null)
+          .map(entry -> (MutableInode<?>) entry.mValue).collect(toSet());
       Set<Long> unflushedRemoves = mInodeCache.getCacheMap().values().stream()
-          .filter(entry -> entry.mValue == null).map(entry -> entry.mKey).collect(toSet());
+          .filter(entry -> entry.mValue == null).map(entry -> (Long) entry.mKey).collect(toSet());
       Set<MutableInode<?>> flushed = mBackingStore.allInodes().stream()
           .filter(inode -> !unflushedRemoves.contains(inode.getId())).collect(toSet());
       return Sets.union(cached, flushed);
@@ -384,10 +396,14 @@ public final class CachingInodeStore implements InodeStore, Closeable {
     @VisibleForTesting
     Map<Long, Set<String>> mUnflushedDeletes = new ConcurrentHashMap<>();
 
-    public EdgeCache(CacheConfiguration conf) {
+    public EdgeCache(CacheConfiguration conf, CacheEvictType cacheEvictType) {
       super(conf, "edge-cache", MetricKey.MASTER_EDGE_CACHE_EVICTIONS,
           MetricKey.MASTER_EDGE_CACHE_HITS, MetricKey.MASTER_EDGE_CACHE_LOAD_TIMES,
-          MetricKey.MASTER_EDGE_CACHE_MISSES, MetricKey.MASTER_EDGE_CACHE_SIZE);
+          MetricKey.MASTER_EDGE_CACHE_MISSES, MetricKey.MASTER_EDGE_CACHE_SIZE, cacheEvictType);
+      MetricsSystem.registerGaugeIfAbsent(MetricKey
+          .MASTER_EDGE_CACHE_ID_TO_CHILD_SIZE.getName(), mIdToChildMap::size);
+      MetricsSystem.registerGaugeIfAbsent(MetricKey
+          .MASTER_EDGE_CACHE_UNFLUSHED_DELETES_SIZE.getName(), mUnflushedDeletes::size);
     }
 
     /**
@@ -461,13 +477,13 @@ public final class CachingInodeStore implements InodeStore, Closeable {
       boolean useBatch = entries.size() > 0 && mBackingStore.supportsBatchWrite();
       try (WriteBatch batch = useBatch ? mBackingStore.createWriteBatch() : null) {
         for (Entry entry : entries) {
-          Edge edge = entry.mKey;
+          Edge edge = (Edge) entry.mKey;
           Optional<RWLockResource> lockOpt = mLockManager.tryLockEdge(edge, LockMode.WRITE);
           if (!lockOpt.isPresent()) {
             continue;
           }
           try (LockResource lr = lockOpt.get()) {
-            Long value = entry.mValue;
+            Long value = (Long) entry.mValue;
             if (value == null) {
               if (useBatch) {
                 batch.removeChild(edge.getId(), edge.getName());
@@ -492,6 +508,7 @@ public final class CachingInodeStore implements InodeStore, Closeable {
 
     @Override
     protected void onCacheUpdate(Edge edge, Long childId) {
+      //System.err.println("onCacheUpdate:"+edge.getId()+":"+childId);
       if (childId == null) {
         mIdToChildMap.removeInnerValue(edge.getId(), edge.getName());
         addToUnflushedDeletes(edge.getId(), edge.getName());
@@ -503,6 +520,7 @@ public final class CachingInodeStore implements InodeStore, Closeable {
 
     @Override
     protected void onCacheRemove(Edge edge) {
+      //System.err.println("remove:"+edge.getId());
       mIdToChildMap.removeInnerValue(edge.getId(), edge.getName());
       removeFromUnflushedDeletes(edge.getId(), edge.getName());
     }
@@ -551,34 +569,46 @@ public final class CachingInodeStore implements InodeStore, Closeable {
 
     @VisibleForTesting
     void verifyIndices() {
-      mMap.forEachValue(1, entry -> {
+
+      mBaseCache.mMap.forEach((key, entry) -> {
         if (entry.mValue == null) {
-          if (!mUnflushedDeletes.get(entry.mKey.getId()).contains(entry.mKey.getName())) {
+          if (!mUnflushedDeletes.get(((Edge) entry.mKey).getId())
+              .contains(((Edge) entry.mKey).getName())) {
             throw new IllegalStateException(
                 "Missing entry " + entry.mKey + " in unflushed deletes index");
           }
         } else {
-          if (!mIdToChildMap.get(entry.mKey.getId()).get(entry.mKey.getName())
+
+          System.err.println("123:" + mIdToChildMap.get(((Edge) entry.mKey).getId()));
+          System.err.println("123and:" + mIdToChildMap.get(((Edge) entry.mKey).getId()));
+          if (!mIdToChildMap.get(((Edge) entry.mKey).getId()).get(((Edge) entry.mKey).getName())
               .equals(entry.mValue)) {
             throw new IllegalStateException(String
                 .format("Missing entry %s=%s from id to child map", entry.mKey, entry.mValue));
           }
         }
       });
-      mIdToChildMap.flattenEntries((parentId, childName, childId) -> {
-        if (!mMap.get(new Edge(parentId, childName)).mValue.equals(childId)) {
-          throw new IllegalStateException(String.format(
-              "Entry %s->%s=%s exists in the index but not the map", parentId, childName, childId));
-        }
-        return null;
-      });
+
       mUnflushedDeletes.forEach((id, names) -> {
         for (String name : names) {
-          if (mMap.get(new Edge(id, name)).mValue != null) {
+          System.err.println("size:" + mBaseCache.mMap.size() + " 456:"
+              + mBaseCache.mMap.get(new Edge(id, name)));
+          if (mBaseCache.mMap.get(new Edge(id, name)).mValue != null) {
             throw new IllegalStateException(String.format(
                 "Entry %s->%s exists in the unflushed index but not in the map", id, name));
           }
         }
+      });
+
+      System.err.println("datamap size:" + mBaseCache.mMap.size()
+          + " toMapSize:" + mIdToChildMap.size());
+      mIdToChildMap.flattenEntries((parentId, childName, childId) -> {
+        System.err.println(parentId + "->" + childName + "->" + childId);
+        if (!mBaseCache.mMap.get(new Edge(parentId, childName)).mValue.equals(childId)) {
+          throw new IllegalStateException(String.format(
+              "Entry %s->%s=%s exists in the index but not the map", parentId, childName, childId));
+        }
+        return null;
       });
     }
   }
