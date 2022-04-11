@@ -12,6 +12,7 @@
 package alluxio.master.journal.ufs;
 
 import alluxio.RuntimeConstants;
+import alluxio.collections.Pair;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
 import alluxio.exception.ExceptionMessage;
@@ -109,6 +110,10 @@ final class UfsJournalLogWriter implements JournalWriter {
     }
     mGarbageCollector = new UfsJournalGarbageCollector(mJournal);
     mEntriesToFlush = new ArrayDeque<>();
+  }
+
+  public void write(Pair<JournalEntry, Long> entryPair) throws JournalClosedException, IOException {
+    write(entryPair.getFirst());
   }
 
   public synchronized void write(JournalEntry entry) throws IOException, JournalClosedException {

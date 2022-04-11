@@ -14,6 +14,7 @@ package alluxio.master.journal;
 import alluxio.Constants;
 import alluxio.annotation.SuppressFBWarnings;
 import alluxio.collections.ConcurrentHashSet;
+import alluxio.collections.Pair;
 import alluxio.concurrent.ForkJoinPoolHelper;
 import alluxio.concurrent.jsr.ForkJoinPool;
 import alluxio.conf.PropertyKey;
@@ -115,7 +116,7 @@ public final class AsyncJournalWriter {
   }
 
   private final JournalWriter mJournalWriter;
-  private final ConcurrentLinkedQueue<JournalEntry> mQueue;
+  private final ConcurrentLinkedQueue<Pair<JournalEntry, Long>> mQueue;
   /** Represents the count of entries added to the journal queue. */
   private final AtomicLong mCounter;
   /** Represents the count of entries flushed to the journal writer. */
@@ -193,6 +194,12 @@ public final class AsyncJournalWriter {
     mJournalName = journalName;
   }
 
+  public static Pair<JournalEntry, Long> createEntryWarp(JournalEntry entry) {
+    Preconditions.checkState(entry.getAllFields().size() <= 2,
+        "Raft journal entries should never set multiple fields, but found %s", entry);
+    return new Pair<JournalEntry, Long>(entry, (long) entry.getSerializedSize());
+  }
+
   /**
    * Appends a {@link JournalEntry} for writing to the journal.
    *
@@ -220,7 +227,7 @@ public final class AsyncJournalWriter {
      * equal to the counter for the entries in the queue.
      */
     mCounter.incrementAndGet();
-    mQueue.offer(entry);
+    mQueue.offer(createEntryWarp(entry));
     return mCounter.get();
   }
 
@@ -298,13 +305,13 @@ public final class AsyncJournalWriter {
         // Write pending entries to journal.
         while (!mQueue.isEmpty()) {
           // Get, but do not remove, the head entry.
-          JournalEntry entry = mQueue.peek();
-          if (entry == null) {
+          Pair<JournalEntry, Long> entryPair = mQueue.peek();
+          if (entryPair == null) {
             // No more entries in the queue. Break write session.
             break;
           }
-          mJournalWriter.write(entry);
-          JournalUtils.sinkAppend(mJournalSinks, entry);
+          mJournalWriter.write(entryPair);
+          JournalUtils.sinkAppend(mJournalSinks, entryPair.getFirst());
           // Remove the head entry, after the entry was successfully written.
           mQueue.poll();
           mWriteCounter++;

@@ -11,6 +11,7 @@
 
 package alluxio.master.journal.raft;
 
+import alluxio.collections.Pair;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
 import alluxio.exception.JournalClosedException;
@@ -18,7 +19,6 @@ import alluxio.master.journal.JournalWriter;
 import alluxio.proto.journal.Journal.JournalEntry;
 import alluxio.util.FormatUtils;
 
-import com.google.common.base.Preconditions;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.util.TimeDuration;
@@ -42,6 +42,7 @@ public class RaftJournalWriter implements JournalWriter {
   // How long to wait for a response from the cluster before giving up and trying again.
   private final long mWriteTimeoutMs;
   private final long mEntrySizeMax;
+  private final boolean mIsTraceEnabled;
   private final long mFlushBatchBytes;
 
   private final AtomicLong mNextSequenceNumberToWrite;
@@ -75,15 +76,15 @@ public class RaftJournalWriter implements JournalWriter {
     mEntrySizeMax = ServerConfiguration
         .getBytes(PropertyKey.MASTER_EMBEDDED_JOURNAL_ENTRY_SIZE_MAX);
     mFlushBatchBytes = mEntrySizeMax / 3;
+    mIsTraceEnabled = LOG.isTraceEnabled();
   }
 
   @Override
-  public void write(JournalEntry entry) throws IOException, JournalClosedException {
+  public void write(Pair<JournalEntry, Long> entryPair) throws IOException, JournalClosedException {
     if (mClosed) {
       throw new JournalClosedException("Cannot write to journal. Journal writer has been closed");
     }
-    Preconditions.checkState(entry.getAllFields().size() <= 2,
-        "Raft journal entries should never set multiple fields, but found %s", entry);
+    JournalEntry entry = entryPair.getFirst();
     if (mCurrentJournalEntrySize.get() > mFlushBatchBytes) {
       flush();
     }
@@ -91,10 +92,12 @@ public class RaftJournalWriter implements JournalWriter {
       mJournalEntryBuilder = JournalEntry.newBuilder();
       mCurrentJournalEntrySize.set(0);
     }
-    LOG.trace("Writing entry {}: {}", mNextSequenceNumberToWrite, entry);
-    mJournalEntryBuilder.addJournalEntries(entry.toBuilder()
-        .setSequenceNumber(mNextSequenceNumberToWrite.getAndIncrement()).build());
-    long size = entry.getSerializedSize();
+    if (mIsTraceEnabled) {
+      LOG.trace("Writing entry {}: {}", mNextSequenceNumberToWrite, entry);
+    }
+    mJournalEntryBuilder.addJournalEntries(
+        entry.toBuilder().setSequenceNumber(mNextSequenceNumberToWrite.getAndIncrement()).build());
+    long size = entryPair.getSecond();
     if (size > mEntrySizeMax) {
       LOG.error("Journal entry size ({}) is bigger than the max allowed size ({}) defined by {}",
           FormatUtils.getSizeFromBytes(size), FormatUtils.getSizeFromBytes(mEntrySizeMax),
@@ -117,7 +120,9 @@ public class RaftJournalWriter implements JournalWriter {
         JournalEntry entry = mJournalEntryBuilder.build();
         Message message = RaftJournalSystem.toRaftMessage(entry);
         mLastSubmittedSequenceNumber.set(flushSN);
-        LOG.trace("Flushing entry {} ({})", entry, message);
+        if (mIsTraceEnabled) {
+          LOG.trace("Flushing entry {} ({})", entry, message);
+        }
         RaftClientReply reply = mClient
             .sendAsync(message, TimeDuration.valueOf(mWriteTimeoutMs, TimeUnit.MILLISECONDS))
             .get(mWriteTimeoutMs, TimeUnit.MILLISECONDS);
