@@ -15,6 +15,8 @@ import alluxio.ClientContext;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.TxPropertyKey;
 import alluxio.conf.PropertyKey;
+import alluxio.exception.status.AlluxioStatusException;
+import alluxio.grpc.ClientCommand;
 import alluxio.master.MasterInquireClient;
 import alluxio.util.ThreadFactoryUtils;
 import alluxio.util.network.NetworkAddressUtils;
@@ -56,9 +58,7 @@ public class CommandHeartbeatContext {
   private static final Map<MasterInquireClient.ConnectDetails, CommandHeartbeatContext>
       COMMAND_HEARTBEAT = new ConcurrentHashMap<>(2);
 
-  private static final long ERROR_CODE = -1L;
   private static final long INITIAL_CODE = -1L;
-  private static final long INVALID_CODE = -1L;
 
   /** The service which executes command heartbeat RPCs. */
   private static ScheduledExecutorService sExecutorService;
@@ -66,6 +66,7 @@ public class CommandHeartbeatContext {
   private final CommandClientMasterSync mCommandClientMasterSync;
   private final AlluxioConfiguration mConf;
   private long mFailHeartbeatTime;
+  private long mLastSuccessfulHeartbeatTime;
   private long mJournalId;
   private final FileSystem mFs;
   private final long mStartTime;
@@ -85,6 +86,7 @@ public class CommandHeartbeatContext {
     mCommandClientMasterSync = new CommandClientMasterSync(ctx, inquireClient);
     mJournalId = 0;
     mFailHeartbeatTime = INITIAL_CODE;
+    mLastSuccessfulHeartbeatTime = INITIAL_CODE;
     mFs = fs;
     mClientId = 0L;
     mHaveHeartbeatSuccessful = false;
@@ -104,73 +106,107 @@ public class CommandHeartbeatContext {
   }
 
   private synchronized void heartbeat() {
-    if (registerClient() < 0) {
-      return;
-    }
-    long journalId;
-    if (mFs instanceof MetadataCachingBaseFileSystem) {
-      journalId = mCommandClientMasterSync.heartbeat(mClientId,
-          ((MetadataCachingBaseFileSystem) mFs).getMetadataCacheSize());
-      handleClearClientMetadataCache(journalId);
-    } else {
-      journalId = mCommandClientMasterSync.heartbeat(mClientId, INVALID_CODE);
-      if (journalId == ERROR_CODE) {
-        LOG.warn("client {} failed to heartbeat with master", mClientId);
+    ClientCommand cmd = null;
+    try {
+      if (mFs instanceof MetadataCachingBaseFileSystem) {
+        cmd = mCommandClientMasterSync.heartbeat(mClientId,
+            ((MetadataCachingBaseFileSystem) mFs).getMetadataCacheSize(), mJournalId);
+      } else {
+        mCommandClientMasterSync.heartbeat(mClientId, INITIAL_CODE, mJournalId);
       }
-    }
-    if (journalId != ERROR_CODE) {
+      handleCommand(cmd);
       mHaveHeartbeatSuccessful = true;
+      mLastSuccessfulHeartbeatTime = System.currentTimeMillis();
+    } catch (AlluxioStatusException e) {
+      LOG.info("Failed to heartbeat on the client {}", getHost(mConf));
+      mFailHeartbeatTime = System.currentTimeMillis();
+      if (mFs instanceof MetadataCachingBaseFileSystem) {
+        handleClientMetadataCache();
+      }
+      e.printStackTrace();
     }
   }
 
-  private void handleClearClientMetadataCache(long journalId) {
-    if (journalId == ERROR_CODE) {
-      if (mFailHeartbeatTime == INITIAL_CODE) {
-        mFailHeartbeatTime = System.currentTimeMillis();
-        return;
-      }
-      long time = System.currentTimeMillis() - mFailHeartbeatTime;
-      long expirationTimeMs = mConf.getMs(TxPropertyKey.USER_COMMAND_HEARTBEAT_INTERVAL_MS);
-      if (time >= expirationTimeMs) {
-        LOG.info("Failed heartbeat in the past {} s , clear all metadata cache", time / 1000.0);
-        if (mFs instanceof MetadataCachingBaseFileSystem) {
-          ((MetadataCachingBaseFileSystem) mFs).dropMetadataCacheAll();
-        }
-      }
+  private void handleCommand(ClientCommand cmd) {
+    if (cmd == null) {
       return;
     }
-    mFailHeartbeatTime = INITIAL_CODE;
-    if (journalId != mJournalId) {
-      mJournalId = journalId;
-      // TODO(dragonyliu): clear metadata cache according to journal
-      LOG.info("Journal journalId change, clear all metadata cache");
-      ((MetadataCachingBaseFileSystem) mFs).dropMetadataCacheAll();
-    } else {
+    switch (cmd.getClientCommandType()) {
+      // Master requests registration
+      case CLIENT_REGISTER:
+        handleRegisterCommand();
+        break;
+      // Master requests remove client metadata cache.
+      case CLIENT_CLEAR:
+        handleClearMetadataCommand(cmd);
+        break;
+      // Journal id don't change, refresh metadata.
+      case CLIENT_NOTHING:
+        handleNOPCommand();
+        break;
+      default:
+        throw new RuntimeException("Un-recognized command from client " + cmd);
+    }
+  }
+
+  private void handleNOPCommand() {
+    if (mFs instanceof MetadataCachingBaseFileSystem) {
       LOG.debug("The journal journalId has not changed, refresh the metadata cache,"
           + " and extend the expiration time.");
-      ((MetadataCachingBaseFileSystem) mFs).updateMetadataCacheAll();
+      refreshMetadata();
     }
   }
 
-  private long registerClient() {
-    boolean needRegister = mHaveHeartbeatSuccessful && mClientId == 0;
-    if (needRegister) {
+  private void handleClearMetadataCommand(ClientCommand cmd) {
+    long journalId = cmd.getJournalId();
+    if (mFs instanceof MetadataCachingBaseFileSystem) {
+      // TODO(dragonyliu): clear metadata cache according to journal
+      LOG.info("Journal journalId change, clear all metadata cache");
+      clearMetadata();
+    }
+    mJournalId = journalId;
+  }
+
+  private void handleRegisterCommand() {
+    try {
+      registerClient();
+      LOG.info("Register client successfully, with the host {} and client id {}",
+          getHost(mConf), mClientId);
+    } catch (AlluxioStatusException e) {
+      LOG.warn("Failed to register the client {} to master: ", getHost(mConf));
+      e.printStackTrace();
+    }
+  }
+
+  private void handleClientMetadataCache() {
+    long time = mFailHeartbeatTime - mLastSuccessfulHeartbeatTime;
+    long expirationTimeMs = mConf.getMs(TxPropertyKey.USER_COMMAND_HEARTBEAT_INTERVAL_MS);
+    if (time >= expirationTimeMs) {
+      LOG.info("Failed heartbeat in the past {} s , clear all metadata cache", time / 1000.0);
+      clearMetadata();
+    }
+  }
+
+  private void clearMetadata() {
+    ((MetadataCachingBaseFileSystem) mFs).dropMetadataCacheAll();
+  }
+
+  private void refreshMetadata() {
+    ((MetadataCachingBaseFileSystem) mFs).updateMetadataCacheAll();
+  }
+
+  private void registerClient() throws AlluxioStatusException {
+    if (mHaveHeartbeatSuccessful) {
       String host = getHost(mConf);
       String containerHost =
           mConf.getOrDefault(TxPropertyKey.USER_CONTAINER_HOSTNAME, "");
       ClientIdentifier clientIdentifier = new ClientIdentifier(host, containerHost, mPid);
       mClientId = mCommandClientMasterSync.getClientId(clientIdentifier);
-      long code =
-          mCommandClientMasterSync.register(mClientId, mStartTime);
-      if (code == ERROR_CODE) {
-        LOG.info("Failed register client to master.");
-        return ERROR_CODE;
-      } else {
-        LOG.info("Register successful, and the clientId is {}", mClientId);
-        return mClientId;
-      }
+      mCommandClientMasterSync.register(mClientId, mStartTime);
+    } else {
+      LOG.info("The client {} has not heartbeat successfully, "
+          + "will register later.", getHost(mConf));
     }
-    return 0;
   }
 
   private String getHost(AlluxioConfiguration conf) {

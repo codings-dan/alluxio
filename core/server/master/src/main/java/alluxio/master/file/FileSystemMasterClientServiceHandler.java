@@ -464,10 +464,11 @@ public final class FileSystemMasterClientServiceHandler
       StreamObserver<alluxio.grpc.CommandHeartbeatPResponse> responseObserver) {
     long clientId = request.getClientId();
     long metadataCacheSize = request.getMetadataCacheSize();
-    long journalId = mFileSystemMaster.commandHeartbeat(clientId, metadataCacheSize);
+    long journalId = request.getJournalId();
     RpcUtils.call(LOG, () -> {
-      return CommandHeartbeatPResponse.newBuilder().setOptions(
-          CommandHeartbeatPOptions.newBuilder().setJournalId(journalId).build()).build();
+      return CommandHeartbeatPResponse.newBuilder().setOptions(CommandHeartbeatPOptions.newBuilder()
+              .setClientCommand(mFileSystemMaster.commandHeartbeat(
+                  clientId, metadataCacheSize, journalId)).build()).build();
     }, "commandHeartbeat", "request=%s", responseObserver, request);
   }
 

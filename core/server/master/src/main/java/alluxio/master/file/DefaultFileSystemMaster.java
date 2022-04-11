@@ -52,6 +52,8 @@ import alluxio.exception.status.PermissionDeniedException;
 import alluxio.exception.status.ResourceExhaustedException;
 import alluxio.exception.status.UnavailableException;
 import alluxio.file.options.DescendantType;
+import alluxio.grpc.ClientCommand;
+import alluxio.grpc.ClientCommandType;
 import alluxio.grpc.DeletePOptions;
 import alluxio.grpc.FileSystemMasterCommonPOptions;
 import alluxio.grpc.GetStatusPOptions;
@@ -4948,17 +4950,25 @@ public class DefaultFileSystemMaster extends CoreMaster
   }
 
   @Override
-  public long commandHeartbeat(long clientId, long metadataCacheSize)  {
-    if (clientId > 0) {
-      ClientInfo client = mClients.getFirstByField(ID_INDEX, clientId);
-      client.setMetadataCacheSize(metadataCacheSize);
-      client.setLastContactMs(System.currentTimeMillis());
+  public ClientCommand commandHeartbeat(long clientId, long metadataCacheSize, long journalId)  {
+    ClientInfo client = mClients.getFirstByField(ID_INDEX, clientId);
+    ClientCommand.Builder builder = ClientCommand.newBuilder();
+    if (client == null) {
+      LOG.warn("Master Can't find the client with id {} ", clientId);
+      return builder.setClientCommandType(ClientCommandType.CLIENT_REGISTER).build();
     }
+    client.setMetadataCacheSize(metadataCacheSize);
+    client.setLastContactMs(System.currentTimeMillis());
     // Get the journal index of the leader node. In most circumstances,
     // the index of each node is same. If they are inconsistent, the largest
     // journal Index belongs to the leader node.
-    return mMasterContext.getJournalSystem().getCurrentSequenceNumbers()
-        .values().stream().max(Long::compare).get();
+    long id = mMasterContext.getJournalSystem().getCurrentSequenceNumbers()
+        .values().stream().max(Long::compare).orElse(0L);
+    if (journalId != id) {
+      return builder.setClientCommandType(ClientCommandType.CLIENT_CLEAR).setJournalId(id).build();
+    } else {
+      return builder.setClientCommandType(ClientCommandType.CLIENT_NOTHING).build();
+    }
   }
 
   @Override

@@ -530,10 +530,11 @@ message CommandHeartbeatPResponse {
 message CommandHeartbeatPRequest {
   optional int64 clientId = 1;
   optional int64 metadataCacheSize = 2;
+  optional int64 journalId = 3;
 }
 
 message CommandHeartbeatPOptions {
-  required int64 journalId = 1;
+  optional grpc.ClientCommand clientCommand = 1;
 }
 
 /**

@@ -13,7 +13,7 @@ package alluxio.client.file;
 
 import alluxio.ClientContext;
 import alluxio.exception.status.AlluxioStatusException;
-import alluxio.exception.status.UnavailableException;
+import alluxio.grpc.ClientCommand;
 import alluxio.master.MasterClientContext;
 import alluxio.master.MasterInquireClient;
 import alluxio.wire.ClientIdentifier;
@@ -22,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.concurrent.ThreadSafe;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 
 /**
@@ -61,70 +60,39 @@ public final class CommandClientMasterSync {
    * Transport client information and get journal id information from the master.
    * @param clientId the client id
    * @param metadataSize the metadata cache size of client
-   * @return the journal id of master
+   * @param journalId the journal id of the client
+   * @return the client command result
    */
-  public synchronized long heartbeat(long clientId, long metadataSize) {
-    Long errorCode = loadConfiguration();
-    if (errorCode != null) {
-      return errorCode;
-    }
-    try {
-      mJournalId = mMasterClient.heartbeat(clientId, metadataSize);
-    } catch (IOException e) {
-      LOG.warn("Failed to get journal id from master: {}", e.toString());
-      return ERROR_CODE;
-    }
-    return mJournalId;
+  public synchronized ClientCommand heartbeat(long clientId, long metadataSize, long journalId)
+      throws AlluxioStatusException {
+    loadConfiguration();
+    return mMasterClient.heartbeat(clientId, metadataSize, journalId);
   }
 
-  public synchronized long getClientId(ClientIdentifier clientIdentifier) {
-    Long errorCode = loadConfiguration();
-    if (errorCode != null) {
-      return errorCode;
-    }
-    long clientId;
-    try {
-      clientId = mMasterClient.getClientId(clientIdentifier);
-    } catch (Exception e) {
-      LOG.warn("Failed to register the client to master: {}", e.toString());
-      return ERROR_CODE;
-    }
-    return clientId;
+  public synchronized long getClientId(ClientIdentifier clientIdentifier)
+      throws AlluxioStatusException {
+    loadConfiguration();
+    return mMasterClient.getClientId(clientIdentifier);
   }
 
   /**
    * Register the client to the master.
    * @param startTime the client start time
    * @param clientId the client id
-   * @return client id
    */
-  public synchronized long register(long clientId, long startTime) {
-    Long errorCode = loadConfiguration();
-    if (errorCode != null) {
-      return errorCode;
-    }
-    try {
-      mMasterClient.register(clientId, startTime);
-    } catch (Exception e) {
-      LOG.warn("Failed to register the client to master: {}", e.toString());
-      return ERROR_CODE;
-    }
-    return 0;
+  public synchronized void register(long clientId, long startTime) throws AlluxioStatusException {
+    loadConfiguration();
+    mMasterClient.register(clientId, startTime);
   }
 
-  private Long loadConfiguration() {
+  private void loadConfiguration() throws AlluxioStatusException {
     if (mMasterClient == null) {
-      if (loadConf()) {
-        mMasterClient = new RetryHandlingFileSystemMasterClient(MasterClientContext
-            .newBuilder(mContext)
-            .setMasterInquireClient(mInquireClient)
-            .build());
-      } else {
-        LOG.error("Failed to load conf and can't heartbeat");
-        return ERROR_CODE;
-      }
+      loadConf();
+      mMasterClient = new RetryHandlingFileSystemMasterClient(MasterClientContext
+          .newBuilder(mContext)
+          .setMasterInquireClient(mInquireClient)
+          .build());
     }
-    return null;
   }
 
   /**
@@ -141,18 +109,9 @@ public final class CommandClientMasterSync {
    *
    * @return true if successfully loaded configuration
    */
-  private boolean loadConf() {
-    try {
-      InetSocketAddress masterAddr = mInquireClient.getPrimaryRpcAddress();
-      mContext.loadConf(masterAddr, true, false);
-    } catch (UnavailableException e) {
-      LOG.error("Failed to get master address during initialization", e);
-      return false;
-    } catch (AlluxioStatusException ae) {
-      LOG.error("Failed to load configuration from meta master during initialization", ae);
-      return false;
-    }
-    return true;
+  private void loadConf() throws AlluxioStatusException {
+    InetSocketAddress masterAddr = mInquireClient.getPrimaryRpcAddress();
+    mContext.loadConf(masterAddr, true, false);
   }
 }
 

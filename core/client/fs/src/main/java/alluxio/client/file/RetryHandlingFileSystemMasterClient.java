@@ -19,6 +19,7 @@ import alluxio.grpc.CheckAccessPOptions;
 import alluxio.grpc.CheckAccessPRequest;
 import alluxio.grpc.CheckConsistencyPOptions;
 import alluxio.grpc.CheckConsistencyPRequest;
+import alluxio.grpc.ClientCommand;
 import alluxio.grpc.ClientRegisterPRequest;
 import alluxio.grpc.CommandHeartbeatPRequest;
 import alluxio.grpc.CompleteFilePOptions;
@@ -412,12 +413,12 @@ public final class RetryHandlingFileSystemMasterClient extends AbstractMasterCli
   }
 
   @Override
-  public long heartbeat(long clientId, long metadataSize)
+  public ClientCommand heartbeat(long clientId, long metadataSize, long journalId)
       throws AlluxioStatusException {
     return retryRPC(() ->
-        mClient.commandHeartbeat(CommandHeartbeatPRequest.newBuilder().setClientId(clientId)
-            .setMetadataCacheSize(metadataSize).build()).getOptions().getJournalId(), RPC_LOG,
-        "CommandHeartbeat", "");
+        mClient.commandHeartbeat(CommandHeartbeatPRequest.newBuilder()
+            .setClientId(clientId).setMetadataCacheSize(metadataSize).setJournalId(journalId)
+            .build()).getOptions().getClientCommand(), RPC_LOG, "CommandHeartbeat", "");
   }
 
   @Override

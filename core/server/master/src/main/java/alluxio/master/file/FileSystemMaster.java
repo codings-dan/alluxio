@@ -26,6 +26,7 @@ import alluxio.exception.UnexpectedAlluxioException;
 import alluxio.exception.status.InvalidArgumentException;
 import alluxio.exception.status.NotFoundException;
 import alluxio.exception.status.UnavailableException;
+import alluxio.grpc.ClientCommand;
 import alluxio.grpc.SetAclAction;
 import alluxio.master.Master;
 import alluxio.master.file.contexts.CheckAccessContext;
@@ -645,9 +646,10 @@ public interface FileSystemMaster extends Master {
    * Transports the information of the client and get journal id from master.
    * @param clientId the client id
    * @param metadataCacheSize the metadata cache size of client
-   * @return the journal id of master
+   * @param journalId the journal id of client
+   * @return the client command result
    */
-  long commandHeartbeat(long clientId, long metadataCacheSize);
+  ClientCommand commandHeartbeat(long clientId, long metadataCacheSize, long journalId);
 
   /**
    * Register client to master.
