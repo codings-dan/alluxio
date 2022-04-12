@@ -119,6 +119,13 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
+  public static final PropertyKey MASTER_JOURNAL_ASYNC_NOTIFY =
+      new Builder(Name.MASTER_JOURNAL_ASYNC_NOTIFY)
+          .setDefaultValue(false)
+          .setDescription("Use asynchronous notifications when flushing journals")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.MASTER)
+          .build();
 
   //
   // Shimfs  related properties
@@ -415,7 +422,8 @@ public final class TxPropertyKey {
     public static final String MASTER_SLOW_LIST_OPERATION_THRESHOLD =
         "alluxio.master.slow.list.operation.threshold";
     public static final String MASTER_METASTORE_BLOCK = "alluxio.master.metastore.block";
-
+    public static final String MASTER_JOURNAL_ASYNC_NOTIFY =
+        "alluxio.master.journal.async.notify";
     public static final String MASTER_METASTORE_BLOCK_STORE_DIR =
         "alluxio.master.metastore.block.store.dir";
     //
