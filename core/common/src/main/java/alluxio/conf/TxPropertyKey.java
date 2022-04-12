@@ -119,6 +119,14 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
+  public static final PropertyKey MASTER_METADATA_SYNC_PARALLEL_LEVEL =
+      new Builder(Name.MASTER_METADATA_SYNC_PARALLEL_LEVEL)
+          .setDefaultValue(1)
+          .setDescription("The maximum number of concurrent sync tasks running for a given sync "
+              + "thread")
+          .setScope(Scope.MASTER)
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .build();
   public static final PropertyKey MASTER_JOURNAL_ASYNC_NOTIFY =
       new Builder(Name.MASTER_JOURNAL_ASYNC_NOTIFY)
           .setDefaultValue(false)
@@ -422,10 +430,13 @@ public final class TxPropertyKey {
     public static final String MASTER_SLOW_LIST_OPERATION_THRESHOLD =
         "alluxio.master.slow.list.operation.threshold";
     public static final String MASTER_METASTORE_BLOCK = "alluxio.master.metastore.block";
+
     public static final String MASTER_JOURNAL_ASYNC_NOTIFY =
         "alluxio.master.journal.async.notify";
     public static final String MASTER_METASTORE_BLOCK_STORE_DIR =
         "alluxio.master.metastore.block.store.dir";
+    public static final String MASTER_METADATA_SYNC_PARALLEL_LEVEL =
+        "alluxio.master.metadata.sync.parallel.level";
     //
     // Worker related properties
     //
