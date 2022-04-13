@@ -58,7 +58,7 @@ public class CacheRequestManager {
   /** The block worker. */
   private final BlockWorker mBlockWorker;
   private final ConcurrentHashMap<Long, CacheRequest> mActiveCacheRequests;
-  private final String mLocalWorkerHostname;
+  private final int mNetWorkHostResolutionTimeoutMs;
   private final FileSystemContext mFsContext;
   /** Keeps track of the number of rejected cache requests. */
   private final AtomicLong mNumRejected = new AtomicLong(0);
@@ -74,8 +74,8 @@ public class CacheRequestManager {
     mBlockWorker = blockWorker;
     mFsContext = fsContext;
     mActiveCacheRequests = new ConcurrentHashMap<>();
-    mLocalWorkerHostname = NetworkAddressUtils.getLocalHostName(
-        (int) ServerConfiguration.getMs(PropertyKey.NETWORK_HOST_RESOLUTION_TIMEOUT_MS));
+    mNetWorkHostResolutionTimeoutMs =
+        (int) ServerConfiguration.getMs(PropertyKey.NETWORK_HOST_RESOLUTION_TIMEOUT_MS);
   }
 
   /**
@@ -160,7 +160,8 @@ public class CacheRequestManager {
 
   private boolean cacheBlock(CacheRequest request) throws IOException, AlluxioException {
     boolean result;
-    boolean isSourceLocal = mLocalWorkerHostname.equals(request.getSourceHost());
+    boolean isSourceLocal = NetworkAddressUtils.isLocalAddress(request.getSourceHost(),
+        mNetWorkHostResolutionTimeoutMs);
     long blockId = request.getBlockId();
     long blockLength = request.getLength();
     // Check if the block has already been cached on this worker
