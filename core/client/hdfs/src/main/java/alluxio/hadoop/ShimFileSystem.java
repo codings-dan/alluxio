@@ -355,12 +355,12 @@ public class ShimFileSystem extends AbstractFileSystem {
     Path path = getFullPath(getUri(), file.getPath());
     if (!pathByPassed(path)) {
       try {
-        return super.getFileBlockLocations(path, start, len);
+        return super.getFileBlockLocations(file, start, len);
       } catch (UnavailableException e) {
         mFallbackManager.markFallBack(this);
       }
     }
-    return mByPassFs.getFileBlockLocations(path, start, len);
+    return mByPassFs.getFileBlockLocations(file, start, len);
   }
 
   public boolean setReplication(Path path, short replication) throws IOException {
