@@ -73,8 +73,8 @@ public class NoopBlockWorker implements BlockWorker {
   }
 
   @Override
-  public String createBlock(long sessionId, long blockId, int tier, String medium,
-      long initialBytes)
+  public String createBlock(long sessionId, long blockId, int tier,
+      CreateBlockOptions createBlockOptions)
       throws BlockAlreadyExistsException, WorkerOutOfSpaceException, IOException {
     return null;
   }

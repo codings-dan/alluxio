@@ -136,8 +136,8 @@ public class ExtensionFactoryRegistry<T extends ExtensionFactory<?, S>,
     }
 
     factories.clear();
-    String libDir = PathUtils.concatPath(conf.get(PropertyKey.HOME), "lib");
-    String extensionDir = conf.get(PropertyKey.EXTENSIONS_DIR);
+    String libDir = PathUtils.concatPath(conf.getString(PropertyKey.HOME), "lib");
+    String extensionDir = conf.getString(PropertyKey.EXTENSIONS_DIR);
     scanLibs(factories, libDir);
     scanExtensions(factories, extensionDir);
 
@@ -199,7 +199,6 @@ public class ExtensionFactoryRegistry<T extends ExtensionFactory<?, S>,
           LOG.debug("Discovered a factory implementation {} - {} in jar {}", factory.getClass(),
               factory, jarPath);
           register(factory, factories);
-          register(factory);
         }
       } catch (Throwable t) {
         LOG.warn("Failed to load jar {}: {}", jar, t.toString());

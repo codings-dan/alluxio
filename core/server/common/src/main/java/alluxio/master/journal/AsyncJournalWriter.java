@@ -281,8 +281,8 @@ public final class AsyncJournalWriter {
       close();
     }
     // Create a new thread.
-    mFlushThread = new Thread(this::doFlush);
-    mNotifyThread = new Thread(this::doNotify);
+    mFlushThread = new Thread(this::doFlush, "AsyncJournalWriterThread-" + mJournalName);
+    mNotifyThread = new Thread(this::doNotify, "AsyncJournalNotifyThread-" + mJournalName));
     // Reset termination flag before starting the new thread.
     mStopFlushing = false;
     mStopNotifying = false;

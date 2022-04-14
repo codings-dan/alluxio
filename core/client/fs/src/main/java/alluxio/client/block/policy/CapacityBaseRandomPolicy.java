@@ -16,8 +16,6 @@ import alluxio.client.block.policy.options.GetWorkerOptions;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.wire.WorkerNetAddress;
 
-import com.google.common.base.MoreObjects;
-
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
@@ -38,43 +36,32 @@ public class CapacityBaseRandomPolicy implements BlockLocationPolicy {
    *
    * @param conf Alluxio configuration
    */
-  public CapacityBaseRandomPolicy(AlluxioConfiguration conf) {}
+  public CapacityBaseRandomPolicy(AlluxioConfiguration conf) {
+  }
 
   @Nullable
   @Override
   public WorkerNetAddress getWorker(GetWorkerOptions options) {
     Iterable<BlockWorkerInfo> blockWorkerInfos = options.getBlockWorkerInfos();
-    // The key is the floor of capacity range the worker cover
-    // For example if worker1 has 100B and worker2 has 100B
-    // The map will have {0L -> worker1, 100L -> worker2}
-    TreeMap<Long, BlockWorkerInfo> capacityFloorMap = new TreeMap<>();
+    // All the capacities will form a ring of continuous intervals
+    // And we throw a dice in the ring and decide which worker to pick
+    // For example if worker1 has capacity 10, worker2 has 20, worker3 has 40,
+    // the ring will look like [0, 10), [10, 30), [30, 70).
+    // A key in the map is the LHS of a range.
+    // So the map will look like {0 -> w1, 10 -> w2, 30 -> w3}.
+    TreeMap<Long, BlockWorkerInfo> rangeStartMap = new TreeMap<>();
     AtomicLong totalCapacity = new AtomicLong(0L);
     blockWorkerInfos.forEach(workerInfo -> {
       if (workerInfo.getCapacityBytes() > 0) {
-        long capacityRangeFloor = totalCapacity.getAndAdd(workerInfo.getCapacityBytes());
-        capacityFloorMap.put(capacityRangeFloor, workerInfo);
+        long capacityRangeStart = totalCapacity.getAndAdd(workerInfo.getCapacityBytes());
+        rangeStartMap.put(capacityRangeStart, workerInfo);
       }
     });
     if (totalCapacity.get() == 0L) {
       return null;
     }
     long randomLong = randomInCapacity(totalCapacity.get());
-    return capacityFloorMap.floorEntry(randomLong).getValue().getNetAddress();
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    return this == o || o instanceof CapacityBaseRandomPolicy;
-  }
-
-  @Override
-  public int hashCode() {
-    return 0;
-  }
-
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).toString();
+    return rangeStartMap.floorEntry(randomLong).getValue().getNetAddress();
   }
 
   protected long randomInCapacity(long totalCapacity) {
