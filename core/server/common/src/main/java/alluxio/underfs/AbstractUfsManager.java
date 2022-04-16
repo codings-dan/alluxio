@@ -208,7 +208,7 @@ public abstract class AbstractUfsManager implements UfsManager {
    * add UfsServers for root ufs.
    */
   public void addUfsServersForRootUfs() {
-    Map<String, String> rootConf =
+    Map<String, Object> rootConf =
         ServerConfiguration.getNestedProperties(PropertyKey.MASTER_MOUNT_TABLE_ROOT_OPTION);
     boolean rootReadOnly =
         ServerConfiguration.getBoolean(PropertyKey.MASTER_MOUNT_TABLE_ROOT_READONLY);
@@ -217,7 +217,7 @@ public abstract class AbstractUfsManager implements UfsManager {
         ServerConfiguration.global()).setReadOnly(rootReadOnly).setShared(rootShared)
         .createMountSpecificConf(rootConf);
 
-    String rootUri = ServerConfiguration.get(PropertyKey.MASTER_MOUNT_TABLE_ROOT_UFS);
+    String rootUri = ServerConfiguration.getString(PropertyKey.MASTER_MOUNT_TABLE_ROOT_UFS);
     AlluxioURI ufsUri = new AlluxioURI(rootUri);
 
     addUfsServers(IdUtils.ROOT_MOUNT_ID, ufsUri, ufsConfig);

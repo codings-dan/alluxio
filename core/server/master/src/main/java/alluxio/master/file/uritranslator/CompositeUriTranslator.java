@@ -40,7 +40,7 @@ public class CompositeUriTranslator extends DefaultUriTranslator {
     super(master, mountTable, inodeTree);
     mUriTranslatorMap = new HashMap<>();
     List<String> list =
-        ServerConfiguration.getList(TxPropertyKey.MASTER_COMPOSITE_URI_TRANSLATOR_IMPL, ",");
+        ServerConfiguration.getList(TxPropertyKey.MASTER_COMPOSITE_URI_TRANSLATOR_IMPL);
     for (String prefixImplStr : list) {
       String[] prefixImplPair = prefixImplStr.split("=");
       if (prefixImplPair.length == 2) {

@@ -197,7 +197,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem
       }
     }
     mWorkAroundSet = new HashSet<>();
-    mWorkAroundSet.addAll(mConf.getList(TxPropertyKey.FUSE_WORKAROUND_LIST, ","));
+    mWorkAroundSet.addAll(mConf.getList(TxPropertyKey.FUSE_WORKAROUND_LIST));
     MetricsSystem.registerGaugeIfAbsent(
         MetricsSystem.getMetricName(MetricKey.FUSE_READING_FILE_COUNT.getName()),
         mOpenFileEntries::size);

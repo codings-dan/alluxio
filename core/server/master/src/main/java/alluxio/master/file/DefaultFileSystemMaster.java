@@ -555,7 +555,7 @@ public class DefaultFileSystemMaster extends CoreMaster
     mUriTranslator = UriTranslator.Factory.create(this, mMountTable, mInodeTree);
     MetricsSystem.registerGaugeIfAbsent(TxMetricKey.CLUSTER_REGISTER_CLIENTS.getName(),
         mClients::size);
-    mSlowListOperationThreshold = ServerConfiguration.getLong(
+    mSlowListOperationThreshold = ServerConfiguration.getMs(
         TxPropertyKey.MASTER_SLOW_LIST_OPERATION_THRESHOLD);
     MetricsSystem.registerCachedGaugeIfAbsent(
         MetricsSystem.getMetricName(
@@ -3782,7 +3782,7 @@ public class DefaultFileSystemMaster extends CoreMaster
     if ((!options.hasSyncIntervalMs() || options.getSyncIntervalMs() < 0)
         && ServerConfiguration.getMs(PropertyKey.USER_FILE_METADATA_SYNC_INTERVAL) < 0) {
       if (ServerConfiguration.getList(
-          TxPropertyKey.MASTER_FILE_METADATA_SYNC_LIST, ",").contains(path.getPath())) {
+          TxPropertyKey.MASTER_FILE_METADATA_SYNC_LIST).contains(path.getPath())) {
         options = options.toBuilder().setSyncIntervalMs(ServerConfiguration.getMs(
             TxPropertyKey.MASTER_FILE_METADATA_SYNC_INTERVAL)).build();
       }

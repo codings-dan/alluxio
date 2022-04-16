@@ -22,11 +22,6 @@ import javax.annotation.concurrent.ThreadSafe;
 public class TxMetricKey {
 
   // Master metrics
-  public static final MetricKey MASTER_TO_REMOVE_BLOCK_COUNT =
-      new MetricKey.Builder("Master.ToRemoveBlockCount")
-          .setDescription("Count of blocks to remove")
-          .setMetricType(MetricType.GAUGE)
-          .build();
   public static final MetricKey MASTER_BLOCK_LOCATIONS_COUNT =
       new MetricKey.Builder("Master.BlockLocationCount")
           .setDescription("Count of blocks location")

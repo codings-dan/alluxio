@@ -59,9 +59,9 @@ public class AbstractInodeAttributesProviderFactory implements UfsServiceFactory
     if (ServerConfiguration.isSet(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_NAME)) {
       try {
         String pluginName =
-                ServerConfiguration.get(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_NAME);
+                ServerConfiguration.getString(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_NAME);
         String pluginPaths =
-                ServerConfiguration.get(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_PATHS);
+                ServerConfiguration.getString(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_PATHS);
         LOG.info("Initializing Alluxio master authorization for pluginName: {} ,pluginPaths: {} ",
             pluginName, pluginPaths);
         UnderFileSystemConfiguration ufsConf = UnderFileSystemConfiguration.defaults(
@@ -100,7 +100,7 @@ public class AbstractInodeAttributesProviderFactory implements UfsServiceFactory
         if (pluginClassLoader instanceof ExtensionsClassLoader) {
           ExtensionsClassLoader extLoader = (ExtensionsClassLoader) pluginClassLoader;
           String pluginPaths =
-              ufsConf.get(TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS);
+              ufsConf.getString(TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS);
           Arrays.stream(pluginPaths.split(":")).forEachOrdered(pluginPath -> {
             try {
               LOG.info("Adding plugin path {}", pluginPath);
