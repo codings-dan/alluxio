@@ -1056,7 +1056,7 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
       throw new NotFoundException(ExceptionMessage.NO_WORKER_FOUND.getMessage(workerId));
     }
 
-    // If this is an excluded worker, do not register any more.
+    // If this is an excluded worker, do not register anymore.
     if (isExcludedWorker(worker)) {
       return;
     }
@@ -1118,6 +1118,10 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
   @Override
   public void workerRegisterStream(WorkerRegisterContext context,
                                   RegisterWorkerPRequest chunk, boolean isFirstMsg) {
+    // If this is an excluded worker, do not register anymore.
+    if (isExcludedWorker(context.mWorker)) {
+      return;
+    }
     if (isFirstMsg) {
       workerRegisterStart(context, chunk);
     } else {
@@ -1188,7 +1192,10 @@ public class DefaultBlockMaster extends CoreMaster implements BlockMaster {
     MasterWorkerInfo worker = context.mWorker;
     Preconditions.checkState(worker != null,
         "No worker metadata found in the WorkerRegisterContext!");
-
+    // If this is an excluded worker, do not register anymore.
+    if (isExcludedWorker(context.mWorker)) {
+      return;
+    }
     // Detect any lost blocks on this worker.
     Set<Long> removedBlocks;
     if (worker.mIsRegistered) {
