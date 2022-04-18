@@ -344,8 +344,8 @@ public final class TxPropertyKey {
           .setDefaultValue("(objectClass=group)")
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT =
-      Builder.durationBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT)
-          .setDefaultValue("10000")
+      Builder.intBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT)
+          .setDefaultValue(10000)
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER =
       Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER)
