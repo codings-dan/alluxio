@@ -43,8 +43,8 @@ public final class HdfsInodeAttributesProviderFactory implements InodeAttributes
 
   @Override
   public boolean supportsPath(String path, @Nullable UnderFileSystemConfiguration conf) {
-    boolean isHdfs = ServerConfiguration.getList(alluxio.conf.PropertyKey.UNDERFS_HDFS_PREFIXES,
-        ",").stream().anyMatch(path::startsWith);
+    boolean isHdfs = ServerConfiguration.getList(alluxio.conf.PropertyKey.UNDERFS_HDFS_PREFIXES)
+        .stream().anyMatch(path::startsWith);
     boolean allowCompatibleOzone = conf != null
         && conf.isSet(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED)
         && conf.getBoolean(
@@ -52,7 +52,7 @@ public final class HdfsInodeAttributesProviderFactory implements InodeAttributes
     boolean isOzone = path.startsWith(Constants.HEADER_OZONE);
 
     if (isHdfs) {
-      List<String> prefixList = ServerConfiguration.getList(PropertyKey.UNDERFS_HDFS_PREFIXES, ",");
+      List<String> prefixList = ServerConfiguration.getList(PropertyKey.UNDERFS_HDFS_PREFIXES);
       prefixList.forEach(item ->
           LOG.info("HdfsInodeAttributesProviderFactory.supportsPath for Prefixes is：{}", item));
       if (conf != null) {
@@ -63,7 +63,7 @@ public final class HdfsInodeAttributesProviderFactory implements InodeAttributes
     LOG.info("allow HDFS compatible Ozone {} isOzone path {}", allowCompatibleOzone, isOzone);
 
     return conf != null && AuthorizationPluginConstants.AUTH_VERSION.equalsIgnoreCase(
-        conf.get(TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME))
+        conf.getString(TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME))
         && ((isHdfs || allowCompatibleOzone && isOzone) || path.equals(MountTable.ROOT));
   }
 }

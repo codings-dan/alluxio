@@ -17,7 +17,7 @@ import alluxio.AlluxioURI;
 import alluxio.annotation.PublicApi;
 import alluxio.cli.CommandUtils;
 import alluxio.cli.fs.FileSystemShellUtils;
-import alluxio.client.block.AlluxioBlockStore;
+import alluxio.client.block.BlockStoreClient;
 import alluxio.client.block.BlockWorkerInfo;
 import alluxio.client.block.policy.BlockLocationPolicy;
 import alluxio.client.block.stream.BlockInStream;
@@ -300,7 +300,7 @@ public final class Load2Command extends AbstractFileSystemCommand {
     OpenFilePOptions options = FileSystemOptions.openFileDefaults(conf);
     BlockLocationPolicy policy = Preconditions.checkNotNull(
         BlockLocationPolicy.Factory
-            .create(conf.get(PropertyKey.USER_UFS_BLOCK_READ_LOCATION_POLICY), conf),
+            .create(conf.getClass(PropertyKey.USER_UFS_BLOCK_READ_LOCATION_POLICY), conf),
         "UFS read location policy Required when loading files");
     WorkerNetAddress dataSource;
     List<Long> blockIds = status.getBlockIds();
@@ -308,7 +308,7 @@ public final class Load2Command extends AbstractFileSystemCommand {
       if (local) {
         dataSource = mFsContext.getNodeLocalWorker();
       } else { // send request to data source
-        AlluxioBlockStore blockStore = AlluxioBlockStore.create(mFsContext);
+        BlockStoreClient blockStore = BlockStoreClient.create(mFsContext);
         Pair<WorkerNetAddress, BlockInStream.BlockInStreamSource> dataSourceAndType = blockStore
             .getDataSourceAndType(status.getBlockInfo(blockId), status, policy, ImmutableMap.of());
         dataSource = dataSourceAndType.getFirst();

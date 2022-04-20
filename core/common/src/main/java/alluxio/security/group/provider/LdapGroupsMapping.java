@@ -103,23 +103,24 @@ public final class LdapGroupsMapping implements GroupMappingService {
   public LdapGroupsMapping(AlluxioConfiguration conf) {
     mConf = conf;
     mGroupNameAttr =
-        mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_GROUP_NAME);
+        mConf.getString(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_GROUP_NAME);
     mPosixUidAttr =
-        mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_UID);
+        mConf.getString(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_UID);
     mPosixGidAttr =
-        mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_GID);
+        mConf.getString(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_GID);
     SEARCH_CONTROLS.setTimeLimit(
         mConf.getInt(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT));
     // Limit the attributes returned to only those required to speed up the search.
     // See HADOOP-10626 and HADOOP-12001 for more details.
     SEARCH_CONTROLS.setReturningAttributes(
         new String[] {mGroupNameAttr, mPosixUidAttr, mPosixGidAttr});
-    mSearchBase = mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_BASE);
+    mSearchBase = mConf.getString(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_BASE);
     LOG.info("LDAP search base = " + mSearchBase);
-    mUserSearchFilter = mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_USER);
+    mUserSearchFilter =
+        mConf.getString(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_USER);
     LOG.info("user query = " + mUserSearchFilter);
     mGroupSearchFilter =
-        mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_GROUP);
+        mConf.getString(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_GROUP);
     mIsPosix = mGroupSearchFilter.contains(POSIX_GROUP)
         && (mUserSearchFilter.contains(POSIX_ACCOUNT)
             || mUserSearchFilter.contains(INET_ORG_PERSON));
@@ -128,7 +129,7 @@ public final class LdapGroupsMapping implements GroupMappingService {
           mGroupSearchFilter, mPosixGidAttr, mPosixUidAttr);
     } else {
       String groupMemberAttr =
-          mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER);
+          mConf.getString(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER);
       mGroupQuery = String.format("(&%s(%s={0}))", mGroupSearchFilter, groupMemberAttr);
     }
     LOG.info("group query = " + mGroupQuery);
@@ -207,19 +208,19 @@ public final class LdapGroupsMapping implements GroupMappingService {
     Hashtable<String, String> env = new Hashtable<>();
     env.put("java.naming.factory.initial", LdapCtxFactory.class.getName());
     env.put("java.naming.provider.url",
-        mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_URL));
+        mConf.getString(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_URL));
     if (mConf.isSet(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL) && mConf.getBoolean(
         TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL)) {
       env.put("java.naming.security.protocol", SSL);
       System.setProperty(SSL_KEYSTORE_KEY,
-          mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE));
+          mConf.getString(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE));
       System.setProperty(SSL_KEYSTORE_PASSWORD_KEY,
           getPassword(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD,
               TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD_FILE));
     }
     env.put("java.naming.security.authentication", SIMPLE_AUTHENTICATION);
     env.put("java.naming.security.principal",
-        mConf.get(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_BIND_USER));
+        mConf.getString(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_BIND_USER));
     env.put("java.naming.security.credentials",
         getPassword(TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD,
             TxPropertyKey.SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD_FILE));
@@ -229,12 +230,12 @@ public final class LdapGroupsMapping implements GroupMappingService {
   private String getPassword(PropertyKey passwordKey, PropertyKey passwordFileKey)
       throws IOException {
     if (mConf.isSet(passwordKey)) {
-      String password = mConf.get(passwordKey);
+      String password = mConf.getString(passwordKey);
       return password;
     }
     String passwordFile = "";
     if (mConf.isSet(passwordFileKey)) {
-      passwordFile = mConf.get(passwordFileKey);
+      passwordFile = mConf.getString(passwordFileKey);
     }
     if (passwordFile.isEmpty()) {
       return "";

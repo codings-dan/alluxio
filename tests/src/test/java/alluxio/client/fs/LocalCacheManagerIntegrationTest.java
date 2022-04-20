@@ -81,13 +81,13 @@ public final class LocalCacheManagerIntegrationTest extends BaseIntegrationTest 
 
   @Test
   public void newCacheRocks() throws Exception {
-    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, "ROCKS");
+    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, PageStoreType.ROCKS);
     testNewCache();
   }
 
   @Test
   public void newCacheLocal() throws Exception {
-    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, "LOCAL");
+    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, PageStoreType.LOCAL);
     testNewCache();
   }
 
@@ -108,13 +108,13 @@ public final class LocalCacheManagerIntegrationTest extends BaseIntegrationTest 
 
   @Test
   public void loadCacheRocks() throws Exception {
-    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, "ROCKS");
+    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, PageStoreType.ROCKS);
     testLoadCache();
   }
 
   @Test
   public void loadCacheLocal() throws Exception {
-    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, "LOCAL");
+    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, PageStoreType.LOCAL);
     testLoadCache();
   }
 
@@ -168,25 +168,25 @@ public final class LocalCacheManagerIntegrationTest extends BaseIntegrationTest 
 
   @Test
   public void loadCacheMismatchedStoreTypeRocks() throws Exception {
-    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, "LOCAL");
-    testLoadCacheConfMismatch(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, "ROCKS");
+    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, PageStoreType.LOCAL);
+    testLoadCacheConfMismatch(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, PageStoreType.ROCKS);
   }
 
   @Test
   public void loadCacheMismatchedStoreTypeLocal() throws Exception {
-    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, "ROCKS");
-    testLoadCacheConfMismatch(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, "LOCAL");
+    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, PageStoreType.ROCKS);
+    testLoadCacheConfMismatch(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, PageStoreType.LOCAL);
   }
 
   @Test
   public void loadCacheSmallerNewCacheSizeRocks() throws Exception {
-    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, "ROCKS");
+    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, PageStoreType.ROCKS);
     testLoadCacheConfMismatch(PropertyKey.USER_CLIENT_CACHE_SIZE, CACHE_SIZE_BYTES / 2);
   }
 
   @Test
   public void loadCacheSmallerNewCacheSizeLocal() throws Exception {
-    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, "LOCAL");
+    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, PageStoreType.LOCAL);
     loadFullCache();
     mCacheManager.close();
     // creates with different configuration
@@ -210,12 +210,12 @@ public final class LocalCacheManagerIntegrationTest extends BaseIntegrationTest 
 
   @Test
   public void loadCacheWithInvalidPageFile() throws Exception {
-    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, "LOCAL");
+    mConf.set(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, PageStoreType.LOCAL);
     loadFullCache();
     mCacheManager.close();
     // creates with an invalid page file stored
     String rootDir = PageStore.getStorePath(PageStoreType.LOCAL,
-        mConf.get(PropertyKey.USER_CLIENT_CACHE_DIR)).get(0).toString();
+        mConf.getString(PropertyKey.USER_CLIENT_CACHE_DIR)).get(0).toString();
     Path pagePath = ((LocalPageStore) mCacheManager.getPageStore())
         .getPageFilePath(new PageInfo(PAGE_ID, PAGE_SIZE_BYTES));
     FileUtils.createFile(Paths.get(pagePath.getParent().toString(), "invalidPageFile").toString());

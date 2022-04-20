@@ -16,6 +16,7 @@ import alluxio.conf.PropertyKey.Builder;
 import alluxio.conf.PropertyKey.ConsistencyCheckLevel;
 import alluxio.conf.PropertyKey.DisplayType;
 import alluxio.grpc.Scope;
+import alluxio.master.metastore.MetastoreType;
 
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -30,7 +31,7 @@ public final class TxPropertyKey {
    * Master related properties.
    */
   public static final PropertyKey MASTER_FILE_METADATA_SYNC_INTERVAL =
-      new Builder(Name.MASTER_FILE_METADATA_SYNC_INTERVAL)
+      Builder.durationBuilder(Name.MASTER_FILE_METADATA_SYNC_INTERVAL)
           .setDefaultValue("-1")
           .setDescription("The interval for syncing UFS metadata before invoking an "
               + "operation on a path. -1 means no sync will occur. 0 means Alluxio will "
@@ -43,7 +44,7 @@ public final class TxPropertyKey {
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey MASTER_FILE_METADATA_SYNC_LIST =
-      new Builder(Name.MASTER_FILE_METADATA_SYNC_LIST)
+      Builder.listBuilder(Name.MASTER_FILE_METADATA_SYNC_LIST)
           .setDefaultValue("")
           .setDescription("A comma-separated list of the paths which are "
               + "configured to be synced, separated by semi-colons.")
@@ -51,7 +52,7 @@ public final class TxPropertyKey {
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey MASTER_LOST_CLIENT_DETECTION_INTERVAL =
-      new Builder(Name.MASTER_LOST_CLIENT_DETECTION_INTERVAL)
+      Builder.durationBuilder(Name.MASTER_LOST_CLIENT_DETECTION_INTERVAL)
           .setDefaultValue("20sec")
           .setAlias("alluxio.master.worker.heartbeat.interval")
           .setDescription("The interval between Alluxio master detections to find lost clients "
@@ -60,31 +61,22 @@ public final class TxPropertyKey {
           .setScope(Scope.SERVER)
           .build();
   public static final PropertyKey MASTER_CLIENT_TIMEOUT_MS =
-      new Builder(Name.MASTER_CLIENT_TIMEOUT_MS)
+      Builder.durationBuilder(Name.MASTER_CLIENT_TIMEOUT_MS)
           .setAlias("alluxio.master.client.timeout.ms")
           .setDefaultValue("5min")
           .setDescription("Timeout between master and client indicating a lost client.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
-  public static final PropertyKey MASTER_COUNT_TO_REMOVE_BLOCKS_ENABLE =
-      new Builder(Name.MASTER_COUNT_TO_REMOVE_BLOCKS_ENABLE)
-          .setAlias("alluxio.master.count.to.remove.blocks.enable")
-          .setDefaultValue(false)
-          .setDescription("Whether enable master collect the value of blocks to remove,"
-              + "which is use in the metric MASTER_TO_REMOVE_BLOCK_COUNT.")
-          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
-          .setScope(Scope.MASTER)
-          .build();
   public static final PropertyKey  MASTER_LIST_CONCURRENT_ENABLED =
-      new Builder(Name.MASTER_LIST_CONCURRENT_ENABLED)
+      Builder.booleanBuilder(Name.MASTER_LIST_CONCURRENT_ENABLED)
           .setDefaultValue(false)
           .setDescription("Whether to enable the concurrent list.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.WORKER)
           .build();
   public static final PropertyKey MASTER_LIST_STATUS_EXECUTOR_POOL_SIZE =
-      new Builder(Name.MASTER_LIST_STATUS_EXECUTOR_POOL_SIZE)
+      Builder.intBuilder(Name.MASTER_LIST_STATUS_EXECUTOR_POOL_SIZE)
           .setDefaultSupplier(() -> Runtime.getRuntime().availableProcessors(),
               "The total number of threads which can concurrently execute list status "
                   + "operations.")
@@ -94,14 +86,14 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .build();
   public static final PropertyKey MASTER_SLOW_LIST_OPERATION_THRESHOLD =
-      new Builder(Name.MASTER_SLOW_LIST_OPERATION_THRESHOLD)
+      Builder.durationBuilder(Name.MASTER_SLOW_LIST_OPERATION_THRESHOLD)
           .setDefaultValue(10000)
           .setDescription("The threshold for slow list operation")
           .setScope(Scope.MASTER)
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .build();
   public static final PropertyKey MASTER_METASTORE_BLOCK_STORE_DIR =
-      new Builder(Name.MASTER_METASTORE_BLOCK_STORE_DIR)
+      Builder.stringBuilder(Name.MASTER_METASTORE_BLOCK_STORE_DIR)
           .setDefaultValue(String.format("${%s}", PropertyKey.Name.MASTER_METASTORE_DIR))
           .setDescription("The block store metastore work directory. "
               + "Only some metastores need disk.")
@@ -109,7 +101,7 @@ public final class TxPropertyKey {
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey MASTER_METASTORE_BLOCK =
-      new Builder(Name.MASTER_METASTORE_BLOCK)
+      Builder.enumBuilder(Name.MASTER_METASTORE_BLOCK, MetastoreType.class)
           .setDefaultValue(String.format("${%s}", PropertyKey.Name.MASTER_METASTORE))
           .setDescription("The type of metastore to use, either HEAP or ROCKS. The heap metastore "
               + "keeps all metadata on-heap, while the rocks metastore stores some metadata on "
@@ -120,7 +112,7 @@ public final class TxPropertyKey {
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey MASTER_METADATA_SYNC_PARALLEL_LEVEL =
-      new Builder(Name.MASTER_METADATA_SYNC_PARALLEL_LEVEL)
+      Builder.intBuilder(Name.MASTER_METADATA_SYNC_PARALLEL_LEVEL)
           .setDefaultValue(1)
           .setDescription("The maximum number of concurrent sync tasks running for a given sync "
               + "thread")
@@ -128,7 +120,7 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .build();
   public static final PropertyKey MASTER_JOURNAL_ASYNC_NOTIFY =
-      new Builder(Name.MASTER_JOURNAL_ASYNC_NOTIFY)
+      Builder.booleanBuilder(Name.MASTER_JOURNAL_ASYNC_NOTIFY)
           .setDefaultValue(false)
           .setDescription("Use asynchronous notifications when flushing journals")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
@@ -139,14 +131,14 @@ public final class TxPropertyKey {
   // Shimfs  related properties
   //
   public static final PropertyKey MASTER_SHIMFS_AUTO_MOUNT_ENABLED =
-      new Builder(Name.MASTER_SHIMFS_AUTO_MOUNT_ENABLED)
+      Builder.booleanBuilder(Name.MASTER_SHIMFS_AUTO_MOUNT_ENABLED)
           .setDescription("If enabled, Alluxio will attempt to mount UFS for foreign URIs.")
-          .setDefaultValue(Boolean.valueOf(false))
+          .setDefaultValue(false)
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey MASTER_SHIMFS_AUTO_MOUNT_ROOT =
-      new Builder(Name.MASTER_SHIMFS_AUTO_MOUNT_ROOT)
+      Builder.stringBuilder(Name.MASTER_SHIMFS_AUTO_MOUNT_ROOT)
           .setDescription("Alluxio root path for auto-mounted UFSes. "
               + "This directory should already exist in Alluxio.")
           .setDefaultValue("/auto-mount")
@@ -154,69 +146,70 @@ public final class TxPropertyKey {
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey MASTER_SHIMFS_AUTO_MOUNT_READONLY =
-      new Builder(Name.MASTER_SHIMFS_AUTO_MOUNT_READONLY)
+      Builder.booleanBuilder(Name.MASTER_SHIMFS_AUTO_MOUNT_READONLY)
           .setDescription("If true, UFSes are auto-mounted as read-only.")
-          .setDefaultValue(Boolean.valueOf(true))
+          .setDefaultValue(true)
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey MASTER_SHIMFS_AUTO_MOUNT_SHARED =
-      new Builder(Name.MASTER_SHIMFS_AUTO_MOUNT_SHARED)
+      Builder.booleanBuilder(Name.MASTER_SHIMFS_AUTO_MOUNT_SHARED)
           .setDescription("If true, UFSes are auto-mounted as shared.")
-          .setDefaultValue(Boolean.valueOf(false))
+          .setDefaultValue(false)
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey MASTER_SHIMFS_AUTO_MOUNT_OPTION =
-      new Builder(Name.MASTER_SHIMFS_AUTO_MOUNT_OPTION)
+      Builder.stringBuilder(Name.MASTER_SHIMFS_AUTO_MOUNT_OPTION)
           .setDefaultValue("")
           .setDescription("Configuration for the auto mount.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey USER_SHIMFS_BYPASS_PREFIX_LIST =
-      new Builder(Name.USER_SHIMFS_BYPASS_PREFIX_LIST)
+      Builder.listBuilder(Name.USER_SHIMFS_BYPASS_PREFIX_LIST)
           .setDescription("A comma-separated list of prefix paths to by-pass. "
               + "User classpath should contain a native hadoop FileSystem implementation"
               + " for target scheme. \n"
-              + String.format("For example: \"%s=s3://bucket1/foo, s3://bucket1/bar\"",
+              + String.format("For example: \"%s=s3://bucket1/foo,s3://bucket1/bar\"",
                   Name.USER_SHIMFS_BYPASS_PREFIX_LIST))
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
   public static final PropertyKey USER_SHIMFS_BYPASS_UFS_IMPL_LIST =
-      new Builder(Name.USER_SHIMFS_BYPASS_UFS_IMPL_LIST)
+      Builder.listBuilder(Name.USER_SHIMFS_BYPASS_UFS_IMPL_LIST)
           .setDescription("A Set of Hadoop FileSystem implementation lists for ufs by-pass. "
               + "User use ':' separate different FileSystem for target scheme. \n"
-              + String.format("For example:fs.s3n.impl:com.amazon.ws.emr.hadoop.fs.EmrFileSystem,"
-                  + "fs.ofs.impl:com.qcloud.chdfs.fs.CHDFSHadoopFileSystemAdapter",
+              + String.format("For example: "
+                  + "\"%s=fs.s3n.impl:com.amazon.ws.emr.hadoop.fs.EmrFileSystem,"
+                  + "fs.ofs.impl:com.qcloud.chdfs.fs.CHDFSHadoopFileSystemAdapter\"",
               Name.USER_SHIMFS_BYPASS_UFS_IMPL_LIST))
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
   public static final PropertyKey USER_SHIMFS_TRANSPARENT_ENABLED =
-      new Builder(Name.USER_SHIMFS_TRANSPARENT_ENABLED)
+      Builder.booleanBuilder(Name.USER_SHIMFS_TRANSPARENT_ENABLED)
           .setDescription("If true, ufs can be transparent to storage directly.")
-          .setDefaultValue(Boolean.valueOf(false))
+          .setDefaultValue(false)
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
   public static final PropertyKey USER_SHIMFS_REFRESH_MOUNT_TABLE_CACHE =
-      new Builder(Name.USER_SHIMFS_REFRESH_MOUNT_TABLE_CACHE)
+      Builder.durationBuilder(Name.USER_SHIMFS_REFRESH_MOUNT_TABLE_CACHE)
           .setDefaultValue("20sec")
           .setDescription("Alluxio refresh mount table cache")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
   public static final PropertyKey MASTER_URI_TRANSLATOR_IMPL =
-      new Builder(Name.MASTER_URI_TRANSLATOR_IMPL)
+      Builder.classBuilder(Name.MASTER_URI_TRANSLATOR_IMPL)
           .setDefaultValue("alluxio.master.file.uritranslator.DefaultUriTranslator")
           .setDescription("The class of uri translator implementation.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey MASTER_COMPOSITE_URI_TRANSLATOR_IMPL =
-      new Builder(Name.MASTER_COMPOSITE_URI_TRANSLATOR_IMPL)
+      Builder.classBuilder(Name.MASTER_COMPOSITE_URI_TRANSLATOR_IMPL)
           .setDefaultValue("/=alluxio.master.file.uritranslator.DefaultUriTranslator")
           .setDescription("The class of uri translator implementations, comma separated.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
@@ -226,35 +219,35 @@ public final class TxPropertyKey {
   // Shimfs  fallback related properties
   //
   public static final PropertyKey USER_FALLBACK_ENABLED =
-      new Builder(Name.USER_FALLBACK_ENABLED)
+      Builder.booleanBuilder(Name.USER_FALLBACK_ENABLED)
           .setDefaultValue(false)
           .setDescription("Shimfs support fallback enabled.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
   public static final PropertyKey USER_LAZY_FALLBACK_TIMEOUT =
-      new Builder(Name.USER_LAZY_FALLBACK_TIMEOUT)
+      Builder.durationBuilder(Name.USER_LAZY_FALLBACK_TIMEOUT)
           .setDefaultValue(60000)
           .setDescription("Shimfs lazy fallback timeout.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
   public static final PropertyKey USER_FALLBACK_RETRY_BASE_SLEEP_MS =
-      new Builder(Name.USER_FALLBACK_RETRY_BASE_SLEEP_MS)
+      Builder.durationBuilder(Name.USER_FALLBACK_RETRY_BASE_SLEEP_MS)
           .setDefaultValue(50)
           .setDescription("Shimfs fallback retry base sleep time.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
   public static final PropertyKey USER_FALLBACK_RETRY_MAX_SLEEP_MS =
-      new Builder(Name.USER_FALLBACK_RETRY_MAX_SLEEP_MS)
+      Builder.durationBuilder(Name.USER_FALLBACK_RETRY_MAX_SLEEP_MS)
           .setDefaultValue(100)
           .setDescription("Shimfs fallback retry MAX sleep times.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
   public static final PropertyKey USER_FALLBACK_RETRY_MAX_TIMES =
-      new Builder(Name.USER_FALLBACK_RETRY_MAX_TIMES)
+      Builder.intBuilder(Name.USER_FALLBACK_RETRY_MAX_TIMES)
           .setDefaultValue(2)
           .setDescription("Shimfs fallback MAX retry times.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
@@ -265,109 +258,109 @@ public final class TxPropertyKey {
   // Security related properties
   //
   public static final PropertyKey UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME =
-      new Builder(Name.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME)
+      Builder.stringBuilder(Name.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME)
           .setDescription("Name of the authorization plugin for the under filesystem.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS =
-      new PropertyKey.Builder(Name.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS)
+      Builder.stringBuilder(Name.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS)
           .setDescription("Classpaths for the under filesystem authorization plugin,"
               + " separated by colons.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey SECURITY_AUTHORIZATION_PLUGIN_NAME =
-      new Builder(Name.SECURITY_AUTHORIZATION_PLUGIN_NAME)
+      Builder.stringBuilder(Name.SECURITY_AUTHORIZATION_PLUGIN_NAME)
           .setDescription("Plugin for master authorization.")
           .setConsistencyCheckLevel(PropertyKey.ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey SECURITY_AUTHORIZATION_PLUGIN_PATHS =
-      new Builder(Name.SECURITY_AUTHORIZATION_PLUGIN_PATHS)
+      Builder.stringBuilder(Name.SECURITY_AUTHORIZATION_PLUGIN_PATHS)
           .setDescription("Classpath for master authorization plugin, separated by colons.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey SECURITY_AUTHORIZATION_PLUGINS_ENABLED =
-      new Builder(Name.SECURITY_AUTHORIZATION_PLUGINS_ENABLED)
+      Builder.booleanBuilder(Name.SECURITY_AUTHORIZATION_PLUGINS_ENABLED)
           .setDefaultValue(false)
           .setDescription("Enable plugins for authorization.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED =
-      new Builder(Name.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)
+      Builder.booleanBuilder(Name.SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED)
           .setDefaultValue(false)
           .setDescription("Enable convert to external ufs namespace Uri.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED =
-      new Builder(Name.SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED)
+      Builder.booleanBuilder(Name.SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED)
           .setDefaultValue(false)
           .setDescription("enable HDFS authorization plugin compatible with ozone")
           .setConsistencyCheckLevel(PropertyKey.ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_URL =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_URL)
+      Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_URL)
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SSL =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL)
+      Builder.booleanBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL)
           .setDefaultValue(false)
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE)
+      Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE)
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD)
+      Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD)
           .setDisplayType(DisplayType.CREDENTIALS)
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD_FILE =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD_FILE)
+      Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_SSL_KEYSTORE_PASSWORD_FILE)
           .setDisplayType(DisplayType.CREDENTIALS)
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_BIND_USER =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_BIND_USER)
+      Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_BIND_USER)
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD)
+      Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD)
           .setDisplayType(DisplayType.CREDENTIALS)
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD_FILE =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD_FILE)
+      Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_BIND_PASSWORD_FILE)
           .setDisplayType(DisplayType.CREDENTIALS)
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_BASE =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_BASE)
+      Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_BASE)
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_USER =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_USER)
+      Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_USER)
           .setDefaultValue("(&(objectClass=user)(sAMAccountName={0}))")
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_GROUP =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_GROUP)
+      Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_SEARCH_FILTER_GROUP)
           .setDefaultValue("(objectClass=group)")
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT)
-          .setDefaultValue("10000")
+      Builder.intBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_SEARCH_TIMEOUT)
+          .setDefaultValue(10000)
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER)
+      Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_MEMBER)
           .setDefaultValue("member")
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_ATTR_GROUP_NAME =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_GROUP_NAME)
+      Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_GROUP_NAME)
           .setDefaultValue("cn")
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_UID =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_UID)
+      Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_UID)
           .setDefaultValue("uidNumber")
           .build();
   public static final PropertyKey SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_GID =
-      new Builder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_GID)
+      Builder.stringBuilder(Name.SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_GID)
           .setDefaultValue("gidNumber")
           .build();
 
@@ -375,7 +368,7 @@ public final class TxPropertyKey {
   // Worker related properties
   //
   public static final PropertyKey WORKER_BLOCK_ANNOTATOR_ENABLED =
-      new Builder(Name.WORKER_BLOCK_ANNOTATOR_ENABLED)
+      Builder.booleanBuilder(Name.WORKER_BLOCK_ANNOTATOR_ENABLED)
           .setDefaultValue(true)
           .setDescription("If false, the worker will not evict when insufficient space for "
               + "worker.")
@@ -387,14 +380,14 @@ public final class TxPropertyKey {
   // User related properties
   //
   public static final PropertyKey USER_COMMAND_HEARTBEAT_ENABLED =
-      new Builder(Name.USER_COMMAND_HEARTBEAT_ENABLED)
+      Builder.booleanBuilder(Name.USER_COMMAND_HEARTBEAT_ENABLED)
           .setDefaultValue(false)
           .setDescription("Enable client get journal index from master")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
           .build();
   public static final PropertyKey USER_COMMAND_HEARTBEAT_INTERVAL_MS =
-      new Builder(Name.USER_COMMAND_HEARTBEAT_INTERVAL_MS)
+      Builder.durationBuilder(Name.USER_COMMAND_HEARTBEAT_INTERVAL_MS)
           .setAlias("alluxio.user.command.heartbeat.interval.ms")
           .setDefaultValue("5min")
           .setDescription("The time period of client master heartbeat to "
@@ -403,7 +396,7 @@ public final class TxPropertyKey {
           .setScope(Scope.CLIENT)
           .build();
   public static final PropertyKey USER_CONTAINER_HOSTNAME =
-      new Builder(Name.USER_CONTAINER_HOSTNAME)
+      Builder.stringBuilder(Name.USER_CONTAINER_HOSTNAME)
           .setDescription("The container hostname if client is running in a container.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.IGNORE)
           .setScope(Scope.WORKER)
@@ -413,7 +406,7 @@ public final class TxPropertyKey {
   // Fuse related properties
   //
   public static final PropertyKey FUSE_WORKAROUND_LIST =
-      new Builder(Name.FUSE_WORKAROUND_LIST)
+      Builder.listBuilder(Name.FUSE_WORKAROUND_LIST)
           .setDefaultValue("")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.CLIENT)
@@ -435,8 +428,6 @@ public final class TxPropertyKey {
     public static final String MASTER_LOST_CLIENT_DETECTION_INTERVAL =
         "alluxio.master.lost.client.detection.interval";
     public static final String MASTER_CLIENT_TIMEOUT_MS = "alluxio.master.client.timeout";
-    public static final String MASTER_COUNT_TO_REMOVE_BLOCKS_ENABLE =
-        "alluxio.master.count.to.remove.blocks.enable";
     public static final String MASTER_LIST_CONCURRENT_ENABLED =
         "alluxio.master.list.concurrent.enabled";
     public static final String MASTER_LIST_STATUS_EXECUTOR_POOL_SIZE =

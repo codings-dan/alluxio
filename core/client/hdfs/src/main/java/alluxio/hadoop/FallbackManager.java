@@ -51,7 +51,7 @@ public class FallbackManager {
   public FallbackManager(AlluxioConfiguration alluxioConf) {
     mNeedFallback = false;
     mConf = alluxioConf;
-    mLazyTimeout = mConf.getLong(TxPropertyKey.USER_LAZY_FALLBACK_TIMEOUT);
+    mLazyTimeout = mConf.getMs(TxPropertyKey.USER_LAZY_FALLBACK_TIMEOUT);
     mExecutorService.setKeepAliveTime(mLazyTimeout * 100, TimeUnit.MILLISECONDS);
     mExecutorService.allowCoreThreadTimeOut(true);
   }

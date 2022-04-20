@@ -172,9 +172,9 @@ public class HdfsInodeAttributesProvider implements InodeAttributesProvider {
           user, groups, bits, path, attributes, checkIsOwner);
       // hdfs dfs -mkdir alluxio:///xxx => user:supergroup
       String superGroup =
-          ServerConfiguration.get(PropertyKey.SECURITY_AUTHORIZATION_PERMISSION_SUPERGROUP);
+          ServerConfiguration.getString(PropertyKey.SECURITY_AUTHORIZATION_PERMISSION_SUPERGROUP);
       UserGroupInformation callerUgi = new AlluxioUserGroupInformation(user, groups,
-          ServerConfiguration.get(PropertyKey.SECURITY_AUTHENTICATION_TYPE));
+          ServerConfiguration.getString(PropertyKey.SECURITY_AUTHENTICATION_TYPE));
       byte[][] pathByNameArr;
       try {
         pathByNameArr = Arrays.stream(PathUtils.getPathComponents(path))
