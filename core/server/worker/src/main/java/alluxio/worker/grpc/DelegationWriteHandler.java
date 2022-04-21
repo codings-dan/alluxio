@@ -15,6 +15,7 @@ import alluxio.grpc.DataMessageMarshaller;
 import alluxio.grpc.DataMessageMarshallerProvider;
 import alluxio.grpc.WriteRequest;
 import alluxio.grpc.WriteResponse;
+import alluxio.security.authentication.AuthenticatedClientUser;
 import alluxio.security.authentication.AuthenticatedUserInfo;
 import alluxio.worker.WorkerProcess;
 import alluxio.worker.block.BlockWorker;
@@ -73,6 +74,9 @@ public class DelegationWriteHandler implements StreamObserver<alluxio.grpc.Write
 
   @Override
   public void onNext(WriteRequest request) {
+    if (AuthenticatedClientUser.getOrNull() == null) {
+      AuthenticatedClientUser.set(mUserInfo.getAuthorizedUserName());
+    }
     if (mWriteHandler == null) {
       mWriteHandler = createWriterHandler(request);
     }

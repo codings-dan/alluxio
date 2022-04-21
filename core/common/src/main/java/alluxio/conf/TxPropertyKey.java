@@ -371,6 +371,15 @@ public final class TxPropertyKey {
           .setDefaultValue("gidNumber")
           .build();
 
+  public static final PropertyKey SECURITY_UNDERFS_HDFS_IMPERSONATION_ENABLED =
+      Builder.booleanBuilder(Name.SECURITY_UNDERFS_HDFS_IMPERSONATION_ENABLED)
+          .setDefaultValue(true)
+          .build();
+  public static final PropertyKey SECURITY_UNDERFS_HDFS_SECURITY_CHECK_ENABLE =
+      Builder.booleanBuilder(Name.SECURITY_UNDERFS_HDFS_SECURITY_CHECK_ENABLE)
+          .setDefaultValue(true)
+          .build();
+
   //
   // Worker related properties
   //
@@ -567,6 +576,11 @@ public final class TxPropertyKey {
         "alluxio.security.group.mapping.ldap.attr.posix.uid";
     public static final String SECURITY_GROUP_MAPPING_LDAP_ATTR_POSIX_GID =
         "alluxio.security.group.mapping.ldap.attr.posix.gid";
+
+    public static final String SECURITY_UNDERFS_HDFS_IMPERSONATION_ENABLED =
+        "alluxio.security.underfs.hdfs.impersonation.enabled";
+    public static final String SECURITY_UNDERFS_HDFS_SECURITY_CHECK_ENABLE =
+        "alluxio.security.underfs.hdfs.security.check.enabled";
 
     // Security extended properties
     public static final String SECURITY_AUTHORIZATION_PLUGINS_EXTERNAL_UFS_NAMESPACE_ENABLED =
