@@ -126,6 +126,13 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
+  public static final PropertyKey MASTER_IN_ALLUXIO_DATA_PAGE_COUNT =
+      Builder.intBuilder(Name.MASTER_IN_ALLUXIO_DATA_PAGE_COUNT)
+          .setDescription("The count of uri showing in the inAlluxioData ui page.")
+          .setDefaultValue(1000)
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.MASTER)
+          .build();
 
   //
   // Shimfs  related properties
@@ -435,6 +442,8 @@ public final class TxPropertyKey {
     public static final String MASTER_SLOW_LIST_OPERATION_THRESHOLD =
         "alluxio.master.slow.list.operation.threshold";
     public static final String MASTER_METASTORE_BLOCK = "alluxio.master.metastore.block";
+    public static final String MASTER_IN_ALLUXIO_DATA_PAGE_COUNT =
+        "alluxio.master.in.alluxio.data.page.count";
 
     public static final String MASTER_JOURNAL_ASYNC_NOTIFY =
         "alluxio.master.journal.async.notify";
