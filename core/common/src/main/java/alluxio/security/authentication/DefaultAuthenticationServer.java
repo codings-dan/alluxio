@@ -13,6 +13,7 @@ package alluxio.security.authentication;
 
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.PropertyKey;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.status.UnauthenticatedException;
 import alluxio.grpc.ChannelAuthenticationScheme;
 import alluxio.grpc.SaslAuthenticationServiceGrpc;
@@ -128,8 +129,25 @@ public class DefaultAuthenticationServer
       throws SaslException {
     switch (authScheme) {
       case SIMPLE:
-      case CUSTOM:
         return new SaslServerHandlerPlain(mHostName, mConfiguration, mImpersonationAuthenticator);
+      case CUSTOM:
+        if (!mConfiguration.isSetByUser(
+            TxPropertyKey.SECURITY_AUTHENTICATION_CUSTOM_SASL_SERVER_CLASS)) {
+          return new SaslServerHandlerPlain(mHostName, mConfiguration, mImpersonationAuthenticator);
+        }
+        Class clazz = mConfiguration.getClass(
+            TxPropertyKey.SECURITY_AUTHENTICATION_CUSTOM_SASL_SERVER_CLASS);
+        try {
+          return (SaslServerHandler) clazz.getConstructor(
+                  new Class[] {String.class, AlluxioConfiguration.class,
+                      ImpersonationAuthenticator.class})
+              .newInstance(mHostName, mConfiguration, mImpersonationAuthenticator);
+        } catch (ReflectiveOperationException e) {
+          throw new IllegalStateException(
+              TxPropertyKey.SECURITY_AUTHENTICATION_CUSTOM_SASL_SERVER_CLASS.getName()
+                    + " configured to invalid class "
+                    + clazz + ". Cannot create SaslServerHandler.", e);
+        }
       default:
         throw new StatusRuntimeException(Status.UNAUTHENTICATED.augmentDescription(
             String.format("Authentication scheme:%s is not supported", authScheme)));

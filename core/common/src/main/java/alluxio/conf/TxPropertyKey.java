@@ -380,6 +380,21 @@ public final class TxPropertyKey {
           .setDefaultValue(true)
           .build();
 
+  public static final PropertyKey SECURITY_AUTHENTICATION_CUSTOM_SASL_CLIENT_CLASS =
+      Builder.classBuilder(Name.SECURITY_AUTHENTICATION_CUSTOM_SASL_CLIENT_CLASS)
+          .setDescription(
+                  "The class to provide a custom security authentication sasl client.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.CLIENT)
+          .build();
+  public static final PropertyKey SECURITY_AUTHENTICATION_CUSTOM_SASL_SERVER_CLASS =
+      Builder.classBuilder(Name.SECURITY_AUTHENTICATION_CUSTOM_SASL_SERVER_CLASS)
+          .setDescription(
+                  "The class to provide a custom security authentication sasl server.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.MASTER)
+          .build();
+
   //
   // Worker related properties
   //
@@ -542,6 +557,11 @@ public final class TxPropertyKey {
     public static final String SECURITY_GROUP_MAPPING_CLASS =
         "alluxio.security.group.mapping.class";
     public static final String SECURITY_LOGIN_USERNAME = "alluxio.security.login.username";
+
+    public static final String SECURITY_AUTHENTICATION_CUSTOM_SASL_CLIENT_CLASS =
+            "alluxio.security.authentication.custom.sasl.client.class";
+    public static final String SECURITY_AUTHENTICATION_CUSTOM_SASL_SERVER_CLASS =
+            "alluxio.security.authentication.custom.sasl.server.class";
 
     // ldap group mapping related properties
     public static final String SECURITY_GROUP_MAPPING_LDAP_URL =
