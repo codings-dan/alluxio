@@ -45,7 +45,7 @@ public class TransparentRefreshThread extends Thread {
     }
     Map<String, String> tmpMountPointToUfsUri = mMountTableCache.get();
     if (tmpMountPointToUfsUri == null) {
-      return true;
+      return false;
     }
     for (Map.Entry<String, String> entry : tmpMountPointToUfsUri.entrySet()) {
       String uri = entry.getValue();
