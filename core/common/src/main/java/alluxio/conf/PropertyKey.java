@@ -706,9 +706,9 @@ public final class PropertyKey implements Comparable<PropertyKey> {
   public static final PropertyKey SITE_CONF_DIR =
       listBuilder(Name.SITE_CONF_DIR)
           .setDefaultSupplier(
-              () -> format("${%s}/,%s/.alluxio/,/etc/alluxio/",
+              () -> format("${%s}/,%s/.alluxio/,/etc/alluxio/,./",
                   Name.CONF_DIR, System.getProperty("user.home")),
-              format("${%s}/,${user.home}/.alluxio/,/etc/alluxio/", Name.CONF_DIR))
+              format("${%s}/,${user.home}/.alluxio/,/etc/alluxio/,./", Name.CONF_DIR))
           .setDescription(
               format("Comma-separated search path for %s.", Constants.SITE_PROPERTIES))
           .setIgnoredSiteProperty(true)
