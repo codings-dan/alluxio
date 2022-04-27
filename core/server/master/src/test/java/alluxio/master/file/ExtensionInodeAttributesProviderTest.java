@@ -203,7 +203,7 @@ public final class ExtensionInodeAttributesProviderTest {
     ServerConfiguration.set(PropertyKey.SECURITY_GROUP_MAPPING_CLASS,
             PermissionCheckerTest.FakeUserGroupsMapping.class.getName());
     ServerConfiguration.set(PropertyKey.SECURITY_AUTHENTICATION_TYPE,
-            AuthType.SIMPLE.getAuthName());
+            AuthType.SIMPLE);
     ServerConfiguration.set(PropertyKey.SECURITY_AUTHORIZATION_PERMISSION_ENABLED, "true");
     ServerConfiguration.set(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGINS_ENABLED, "true");
 

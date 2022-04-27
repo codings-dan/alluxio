@@ -18,6 +18,7 @@ import alluxio.exception.status.AlreadyExistsException;
 import alluxio.exception.status.NotFoundException;
 import alluxio.grpc.CheckAccessPOptions;
 import alluxio.grpc.CheckConsistencyPOptions;
+import alluxio.grpc.ClientCommand;
 import alluxio.grpc.CompleteFilePOptions;
 import alluxio.grpc.CreateDirectoryPOptions;
 import alluxio.grpc.CreateFilePOptions;
@@ -328,12 +329,12 @@ public interface FileSystemMasterClient extends Client {
    * Transports the information of the client and get journal id from master.
    * @param clientId the client id
    * @param metadataSize the metadata cache size of client
-   * @return the journal id of master
-   * @throws AlluxioStatusException
+   * @param journalId the journal id of the client
+   * @return the client command result
    */
-  default long heartbeat(long clientId, long metadataSize)
+  default ClientCommand heartbeat(long clientId, long metadataSize, long journalId)
       throws AlluxioStatusException {
-    return -1;
+    return null;
   }
 
   /**

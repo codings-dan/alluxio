@@ -18,6 +18,7 @@ import alluxio.metrics.MetricKey;
 import alluxio.metrics.MetricsSystem;
 
 import com.codahale.metrics.Counter;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.SimpleTimeLimiter;
@@ -56,16 +57,19 @@ public class TimeBoundPageStore implements PageStore {
   }
 
   @Override
-  public void put(PageId pageId, byte[] page) throws ResourceExhaustedException, IOException {
+  public void put(PageInfo pageInfo, byte[] page)
+      throws ResourceExhaustedException, IOException {
     Callable<Void> callable = () -> {
-      mPageStore.put(pageId, page);
+      mPageStore.put(pageInfo, page);
       return null;
     };
     try {
       mTimeLimter.callWithTimeout(callable, mTimeoutMs, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
+      // Task got cancelled by others, interrupt the current thread
+      // and then throw a runtime ex to make the higher level stop.
       Thread.currentThread().interrupt();
-      throw new IOException(e);
+      throw new RuntimeException(e);
     } catch (TimeoutException e) {
       Metrics.STORE_PUT_TIMEOUT.inc();
       throw new IOException(e);
@@ -83,15 +87,19 @@ public class TimeBoundPageStore implements PageStore {
   }
 
   @Override
-  public int get(PageId pageId, int pageOffset, int bytesToRead, byte[] buffer, int bufferOffset)
+  public int get(PageInfo pageInfo, int pageOffset, int bytesToRead,
+      byte[] buffer, int bufferOffset)
       throws IOException, PageNotFoundException {
     Callable<Integer> callable = () ->
-        mPageStore.get(pageId, pageOffset, bytesToRead, buffer, bufferOffset);
+        mPageStore
+            .get(pageInfo, pageOffset, bytesToRead, buffer, bufferOffset);
     try {
       return mTimeLimter.callWithTimeout(callable, mTimeoutMs, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
+      // Task got cancelled by others, interrupt the current thread
+      // and then throw a runtime ex to make the higher level stop.
       Thread.currentThread().interrupt();
-      throw new IOException(e);
+      throw new RuntimeException(e);
     } catch (TimeoutException e) {
       Metrics.STORE_GET_TIMEOUT.inc();
       throw new IOException(e);
@@ -105,16 +113,19 @@ public class TimeBoundPageStore implements PageStore {
   }
 
   @Override
-  public void delete(PageId pageId) throws IOException, PageNotFoundException {
+  public void delete(PageInfo pageInfo)
+      throws IOException, PageNotFoundException {
     Callable<Void> callable = () -> {
-      mPageStore.delete(pageId);
+      mPageStore.delete(pageInfo);
       return null;
     };
     try {
       mTimeLimter.callWithTimeout(callable, mTimeoutMs, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
+      // Task got cancelled by others, interrupt the current thread
+      // and then throw a runtime ex to make the higher level stop.
       Thread.currentThread().interrupt();
-      throw new IOException(e);
+      throw new RuntimeException(e);
     } catch (TimeoutException e) {
       Metrics.STORE_DELETE_TIMEOUT.inc();
       throw new IOException(e);
@@ -141,6 +152,14 @@ public class TimeBoundPageStore implements PageStore {
   public void close() throws Exception {
     mExecutorService.shutdown();
     mPageStore.close();
+  }
+
+  /**
+   * @return return the underlying page store for test purpose
+   */
+  @VisibleForTesting
+  public PageStore getPageStore() {
+    return mPageStore;
   }
 
   private static final class Metrics {

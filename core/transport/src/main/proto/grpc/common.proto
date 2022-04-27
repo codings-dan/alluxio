@@ -78,6 +78,12 @@ enum CommandType {
   Persist = 5;  // Ask the worker to persist a file for lineage
 }
 
+enum ClientCommandType {
+  CLIENT_REGISTER = 0; // Ask the client to re-register
+  CLIENT_CLEAR = 1;
+  CLIENT_NOTHING = 2;
+}
+
 message ConfigProperty {
   optional string name = 1;
   optional string source = 2;
@@ -92,6 +98,11 @@ enum TtlAction {
 message Command {
   optional CommandType commandType = 1;
   repeated int64 data = 2;
+}
+
+message ClientCommand {
+  optional ClientCommandType clientCommandType = 1;
+  optional int64 journalId = 2;
 }
 
 message LocalityTier {

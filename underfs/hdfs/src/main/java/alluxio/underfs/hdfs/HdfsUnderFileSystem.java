@@ -16,7 +16,9 @@ import alluxio.Constants;
 import alluxio.SyncInfo;
 import alluxio.UfsConstants;
 import alluxio.collections.Pair;
+import alluxio.conf.InstancedConfiguration;
 import alluxio.conf.PropertyKey;
+import alluxio.conf.TxPropertyKey;
 import alluxio.retry.CountingRetry;
 import alluxio.retry.RetryPolicy;
 import alluxio.security.authorization.AccessControlList;
@@ -36,6 +38,7 @@ import alluxio.underfs.options.FileLocationOptions;
 import alluxio.underfs.options.MkdirsOptions;
 import alluxio.underfs.options.OpenOptions;
 import alluxio.util.CommonUtils;
+import alluxio.util.SecurityUtils;
 import alluxio.util.UnderFileSystemUtils;
 import alluxio.util.network.NetworkAddressUtils;
 
@@ -69,6 +72,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -97,13 +101,12 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
   private static final String HDFS_EC_CODEC_REGISTRY_CLASS =
       "org.apache.hadoop.io.erasurecode.CodecRegistry";
 
-  private static final String JAVAX_WS_RS_CORE_MEDIA_TYPE =
-      "javax.ws.rs.core.MediaType";
-
   private final LoadingCache<String, FileSystem> mUserFs;
   private final HdfsAclProvider mHdfsAclProvider;
 
   private HdfsActiveSyncProvider mHdfsActiveSyncer;
+  private ConcurrentHashMap<String, Boolean> mSetOwnerSkipImpersonationMap =
+      new ConcurrentHashMap<>();
 
   /**
    * Factory method to constructs a new HDFS {@link UnderFileSystem} instance.
@@ -144,11 +147,14 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
       }
     } catch (Exception e) {
       // ignore
-      LOG.warn("Cannot create SupportedHdfsAclProvider. HDFS ACLs will not be supported.");
+      LOG.warn("Cannot create SupportedHdfsAclProvider. HDFS ACLs is not supported, "
+          + "Please upgrade to an HDFS version > 2.4 to enable support for ACL");
+      LOG.debug("Exception:", e);
     }
     mHdfsAclProvider = hdfsAclProvider;
 
-    Path path = new Path(ufsUri.toString());
+    final String ufsPrefix = ufsUri.toString();
+    final Configuration ufsHdfsConf = hdfsConf;
     // UserGroupInformation.setConfiguration(hdfsConf) will trigger service loading.
     // Stash the classloader to prevent service loading throwing exception due to
     // classloader mismatch.
@@ -165,17 +171,8 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
           Class.forName(HDFS_EC_CODEC_REGISTRY_CLASS);
         } catch (ClassNotFoundException e) {
           LOG.warn("Cannot initialize HDFS EC CodecRegistry. "
-              + "HDFS EC will not be supported:", e);
+              + "HDFS EC will not be supported: {}", e.toString());
         }
-      }
-
-      try {
-        // If this class is not loaded here, it will be later loaded by the system classloader
-        // from alluxio server jar, but will be called by a class loaded with extension
-        // classloader.
-        Class.forName(JAVAX_WS_RS_CORE_MEDIA_TYPE);
-      } catch (ClassNotFoundException e) {
-        LOG.warn("Cannot initialize javax.ws.rs.MediaType.", e);
       }
     } finally {
       Thread.currentThread().setContextClassLoader(currentClassLoader);
@@ -195,7 +192,24 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
           // Set the class loader to ensure FileSystem implementations are
           // loaded by the same class loader to avoid ServerConfigurationError
           Thread.currentThread().setContextClassLoader(currentClassLoader);
-          return path.getFileSystem(hdfsConf);
+          boolean securityCheckEnabled =
+              mUfsConf.getBoolean(TxPropertyKey.SECURITY_UNDERFS_HDFS_SECURITY_CHECK_ENABLE);
+          if (!HDFS_USER.equals(userKey)) {
+            UserGroupInformation proxyUgi = UserGroupInformation.createProxyUser(userKey,
+                UserGroupInformation.getLoginUser());
+            LOG.info("Connecting to hdfs(impersonation): {} proxyUgi: {} user: {}",
+                ufsPrefix, proxyUgi, userKey);
+            return HdfsSecurityUtils.runAs(proxyUgi, () -> {
+              Path path = new Path(ufsPrefix);
+              return path.getFileSystem(ufsHdfsConf);
+            }, securityCheckEnabled);
+          }
+          LOG.info("Connecting to hdfs: {} ugi: {}", ufsPrefix,
+              UserGroupInformation.getLoginUser());
+          return HdfsSecurityUtils.runAsCurrentUser(() -> {
+            Path path = new Path(ufsPrefix);
+            return path.getFileSystem(ufsHdfsConf);
+          }, securityCheckEnabled);
         } finally {
           Thread.currentThread().setContextClassLoader(previousClassLoader);
         }
@@ -219,8 +233,10 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
       }
     } catch (Exception e) {
       // ignore
-      LOG.warn("Cannot create SupportedHdfsActiveSyncProvider."
-          + "HDFS ActiveSync will not be supported.");
+      LOG.warn("Cannot create SupportedHdfsActiveSyncProvider. "
+          + "HDFS ActiveSync will not be supported. "
+          + "Please upgrade to an HDFS version > 2.6.1 to enable support for HDFS ActiveSync");
+      LOG.debug("Exception:", e);
     }
 
     mHdfsActiveSyncer = hdfsActiveSyncProvider;
@@ -249,7 +265,7 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
 
     // Load HDFS site properties from the given file and overwrite the default HDFS conf,
     // the path of this file can be passed through --option
-    for (String path : conf.get(PropertyKey.UNDERFS_HDFS_CONFIGURATION).split(":")) {
+    for (String path : conf.getString(PropertyKey.UNDERFS_HDFS_CONFIGURATION).split(":")) {
       if (!path.isEmpty()) {
         hdfsConf.addResource(new Path(path));
       }
@@ -259,7 +275,7 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
     // discover available file system implementations. However this configuration setting is
     // required for earlier Hadoop versions plus it is still honoured as an override even in 2.x so
     // if present propagate it to the Hadoop configuration
-    String ufsHdfsImpl = conf.get(PropertyKey.UNDERFS_HDFS_IMPL);
+    String ufsHdfsImpl = conf.getString(PropertyKey.UNDERFS_HDFS_IMPL);
     if (!StringUtils.isEmpty(ufsHdfsImpl)) {
       hdfsConf.set("fs.hdfs.impl", ufsHdfsImpl);
     }
@@ -270,8 +286,9 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
         System.getProperty("fs.hdfs.impl.disable.cache", "true"));
 
     // Set all parameters passed through --option
-    for (Map.Entry<String, String> entry : conf.getMountSpecificConf().entrySet()) {
-      hdfsConf.set(entry.getKey(), entry.getValue());
+    for (Map.Entry<String, Object> entry : conf.getMountSpecificConf().entrySet()) {
+      hdfsConf.set(entry.getKey(),
+          entry.getValue() == null ? null : entry.getValue().toString());
     }
     return hdfsConf;
   }
@@ -374,7 +391,7 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
       throws IOException {
     // If the user has hinted the underlying storage nodes are not co-located with Alluxio
     // workers, short circuit without querying the locations.
-    if (Boolean.valueOf(mUfsConf.get(PropertyKey.UNDERFS_HDFS_REMOTE))) {
+    if (mUfsConf.getBoolean(PropertyKey.UNDERFS_HDFS_REMOTE)) {
       return null;
     }
     FileSystem hdfs = getFs();
@@ -510,8 +527,8 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
         || !mUfsConf.isSet(PropertyKey.MASTER_PRINCIPAL)) {
       return;
     }
-    String masterKeytab = mUfsConf.get(PropertyKey.MASTER_KEYTAB_KEY_FILE);
-    String masterPrincipal = mUfsConf.get(PropertyKey.MASTER_PRINCIPAL);
+    String masterKeytab = mUfsConf.getString(PropertyKey.MASTER_KEYTAB_KEY_FILE);
+    String masterPrincipal = mUfsConf.getString(PropertyKey.MASTER_PRINCIPAL);
 
     login(PropertyKey.MASTER_KEYTAB_KEY_FILE, masterKeytab, PropertyKey.MASTER_PRINCIPAL,
         masterPrincipal, host);
@@ -523,8 +540,8 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
         || !mUfsConf.isSet(PropertyKey.WORKER_PRINCIPAL)) {
       return;
     }
-    String workerKeytab = mUfsConf.get(PropertyKey.WORKER_KEYTAB_FILE);
-    String workerPrincipal = mUfsConf.get(PropertyKey.WORKER_PRINCIPAL);
+    String workerKeytab = mUfsConf.getString(PropertyKey.WORKER_KEYTAB_FILE);
+    String workerPrincipal = mUfsConf.getString(PropertyKey.WORKER_PRINCIPAL);
 
     login(PropertyKey.WORKER_KEYTAB_FILE, workerKeytab, PropertyKey.WORKER_PRINCIPAL,
         workerPrincipal, host);
@@ -693,22 +710,57 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
     if (user == null && group == null) {
       return;
     }
+    String impersonatedUser = null;
+    if (mUfsConf.getBoolean(TxPropertyKey.SECURITY_UNDERFS_HDFS_IMPERSONATION_ENABLED)) {
+      impersonatedUser = SecurityUtils.getOwnerFromGrpcClient(
+          new InstancedConfiguration(mUfsConf.copyProperties()));
+    }
+    if (impersonatedUser != null && mSetOwnerSkipImpersonationMap.getOrDefault(
+        impersonatedUser, false)) {
+      try {
+        FileSystem fileSystem = mUserFs.get("");
+        FileStatus fileStatus = fileSystem.getFileStatus(new Path(path));
+        fileSystem.setOwner(fileStatus.getPath(), user, group);
+      } catch (ExecutionException e) {
+        throw new IOException("setOwner: Failed to get FileSystem for ugi: "
+            + UserGroupInformation.getLoginUser(), e.getCause());
+      } catch (FileNotFoundException e) {
+        throw e;
+      } catch (IOException e) {
+        mSetOwnerSkipImpersonationMap.remove(impersonatedUser);
+        String message = String.format(
+            "Failed to set owner (with ugi: %s) for %s to %s:%s error: %s",
+            UserGroupInformation.getLoginUser(), path, user, group, e.getMessage());
+        if (mUfsConf.getBoolean(PropertyKey.UNDERFS_ALLOW_SET_OWNER_FAILURE)) {
+          throw new IOException(message, e);
+        }
+        LOG.warn(message);
+      }
+      return;
+    }
     FileSystem hdfs = getFs();
     try {
       FileStatus fileStatus = hdfs.getFileStatus(new Path(path));
       hdfs.setOwner(fileStatus.getPath(), user, group);
     } catch (IOException e) {
+      if (impersonatedUser != null) {
+        mSetOwnerSkipImpersonationMap.put(impersonatedUser, true);
+        LOG.warn("Failed to set owner (HDFS impersonated user: {}) for {} to {}:{}, error: {}. "
+            + "Will skip using impersonated user.", impersonatedUser, path, user, group,
+            e.getMessage());
+        setOwner(path, user, group);
+        return;
+      }
       LOG.debug("Exception: ", e);
       if (!mUfsConf.getBoolean(PropertyKey.UNDERFS_ALLOW_SET_OWNER_FAILURE)) {
         LOG.warn("Failed to set owner for {} with user: {}, group: {}: {}. "
-            + "Running Alluxio as superuser is required to modify ownership of local files",
+                + "Running Alluxio as superuser is required to modify ownership of local files",
             path, user, group, e.toString());
         throw e;
-      } else {
-        LOG.warn("Failed to set owner for {} with user: {}, group: {}: {}. "
-            + "This failure is ignored but may cause permission inconsistency between Alluxio "
-            + "and local under file system", path, user, group, e.toString());
       }
+      LOG.warn("Failed to set owner for {} with user: {}, group: {}: {}. "
+          + "This failure is ignored but may cause permission inconsistency between Alluxio "
+          + "and local under file system", path, user, group, e.toString());
     }
   }
 
@@ -838,9 +890,15 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
    * @return the underlying HDFS {@link FileSystem} object
    */
   private FileSystem getFs() throws IOException {
+    boolean isImpersonationEnabled =
+        mUfsConf.getBoolean(TxPropertyKey.SECURITY_UNDERFS_HDFS_IMPERSONATION_ENABLED);
+    String user = HDFS_USER;
+    if (isImpersonationEnabled) {
+      user = SecurityUtils.getOwnerFromGrpcClient(
+          new InstancedConfiguration(mUfsConf.copyProperties()));
+    }
     try {
-      // TODO(gpang): handle different users
-      return mUserFs.get(HDFS_USER);
+      return mUserFs.get(user);
     } catch (ExecutionException e) {
       throw new IOException("Failed get FileSystem for " + mUri, e.getCause());
     }

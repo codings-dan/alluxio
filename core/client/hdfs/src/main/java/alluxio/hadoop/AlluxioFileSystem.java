@@ -52,7 +52,7 @@ public class AlluxioFileSystem extends DelegateToFileSystem {
 
   @Override
   public int getUriDefaultPort() {
-    return Integer.parseInt(PropertyKey.MASTER_RPC_PORT.getDefaultValue());
+    return (Integer) PropertyKey.MASTER_RPC_PORT.getDefaultValue();
   }
 
   public void checkScheme(URI uri, String supportedScheme) {

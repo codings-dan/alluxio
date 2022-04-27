@@ -12,7 +12,9 @@
 package alluxio.client.block.stream;
 
 import alluxio.conf.AlluxioConfiguration;
+import alluxio.exception.status.UnavailableException;
 import alluxio.grpc.CacheRequest;
+import alluxio.grpc.CachesRequest;
 import alluxio.grpc.ClearMetricsRequest;
 import alluxio.grpc.ClearMetricsResponse;
 import alluxio.grpc.CreateLocalBlockRequest;
@@ -50,6 +52,7 @@ public interface BlockWorkerClient extends Closeable {
      *
      * @param userState the user subject
      * @param address the address of the worker
+     * @param alluxioConf Alluxio configuration
      * @return a new {@link BlockWorkerClient}
      */
     public static BlockWorkerClient create(UserState userState, GrpcServerAddress address,
@@ -57,6 +60,8 @@ public interface BlockWorkerClient extends Closeable {
         throws IOException {
       try {
         return new DefaultBlockWorkerClient(userState, address, alluxioConf);
+      } catch (UnavailableException e) {
+        throw e;
       } catch (Exception e) {
         throw new IOException(
             String.format("Failed to connect to block worker (%s)", address), e);
@@ -149,4 +154,12 @@ public interface BlockWorkerClient extends Closeable {
    * @throws StatusRuntimeException if any error occurs
    */
   void cache(CacheRequest request);
+
+  /**
+   * Caches a block.
+   *
+   * @param request the cache request
+   * @throws StatusRuntimeException if any error occurs
+   */
+  void caches(CachesRequest request);
 }

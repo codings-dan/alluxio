@@ -37,15 +37,31 @@ public interface UriTranslator {
      */
     public static UriTranslator create(FileSystemMaster master, MountTable mountTable,
         InodeTree inodeTree) {
-      String className =
-          ServerConfiguration.get(TxPropertyKey.MASTER_URI_TRANSLATOR_IMPL);
-      return create(master, mountTable, inodeTree, className);
+      Class providerClass =
+          ServerConfiguration.getClass(TxPropertyKey.MASTER_URI_TRANSLATOR_IMPL);
+      return create(master, mountTable, inodeTree, providerClass);
     }
 
     /**
      * @param master Alluxio file system master
      * @param mountTable Alluxio mount table
      * @param inodeTree inode tree of the file system master
+     * @param providerClass the provider class
+     * @return the generated {@link UriTranslator}
+     */
+    public static UriTranslator create(FileSystemMaster master, MountTable mountTable,
+        InodeTree inodeTree, Class<?> providerClass) {
+      return (UriTranslator) CommonUtils
+          .createNewClassInstance(providerClass,
+              new Class[] {FileSystemMaster.class, MountTable.class, InodeTree.class},
+              new Object[] {master, mountTable, inodeTree});
+    }
+
+    /**
+     * @param master Alluxio file system master
+     * @param mountTable Alluxio mount table
+     * @param inodeTree inode tree of the file system master
+     * @param className provider class name
      * @return the generated {@link UriTranslator}
      */
     public static UriTranslator create(FileSystemMaster master, MountTable mountTable,
@@ -58,10 +74,7 @@ public interface UriTranslator {
         throw new RuntimeException(className + " not found");
       }
 
-      return (UriTranslator) CommonUtils
-          .createNewClassInstance(providerClass,
-              new Class[] {FileSystemMaster.class, MountTable.class, InodeTree.class},
-              new Object[] {master, mountTable, inodeTree});
+      return create(master, mountTable, inodeTree, providerClass);
     }
   }
 

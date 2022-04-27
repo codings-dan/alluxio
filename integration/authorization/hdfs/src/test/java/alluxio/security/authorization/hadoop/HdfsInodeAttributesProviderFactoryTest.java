@@ -57,7 +57,8 @@ public class HdfsInodeAttributesProviderFactoryTest {
         TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME.getName(), "invalid-1.0",
         DFS_NAMENODE_INODE_ATTRIBUTES_PROVIDER_KEY,
         DummyHdfsProvider.class.getName()));
-    String s = ServerConfiguration.get(TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME);
+    String s = ServerConfiguration.getString(
+        TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME);
     System.out.println(s.charAt(3));
     assertTrue(factory.supportsPath(MountTable.ROOT, conf));
     assertTrue(factory.supportsPath("hdfs://localhost/test/path", conf));
@@ -85,10 +86,10 @@ public class HdfsInodeAttributesProviderFactoryTest {
     ServerConfiguration.set(
         TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME, "invalid-1.0");
     boolean isHdfs = ServerConfiguration.getList(
-        alluxio.conf.PropertyKey.UNDERFS_HDFS_PREFIXES, ",")
+        alluxio.conf.PropertyKey.UNDERFS_HDFS_PREFIXES)
         .stream().anyMatch(path::startsWith);
     return ufsConf != null && AuthorizationPluginConstants.AUTH_VERSION.equalsIgnoreCase(
-        ServerConfiguration.get(TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME))
+        ServerConfiguration.getString(TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME))
         && (isHdfs || path.equals(MountTable.ROOT));
   }
 
@@ -98,7 +99,7 @@ public class HdfsInodeAttributesProviderFactoryTest {
         new InstancedConfiguration(new AlluxioProperties());
     instancedConfiguration.set(
         TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME, "1111111");
-    String s = instancedConfiguration.get(
+    String s = instancedConfiguration.getString(
         TxPropertyKey.UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_NAME);
     System.out.println(s.charAt(6));
   }

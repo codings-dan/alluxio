@@ -276,7 +276,7 @@ public class FileSystemContext implements Closeable {
     mCommandHeartbeatEnabled = getClusterConf()
         .getBoolean(TxPropertyKey.USER_COMMAND_HEARTBEAT_ENABLED);
     if (mMetricsEnabled) {
-      MetricsSystem.startSinks(getClusterConf().get(PropertyKey.METRICS_CONF_FILE));
+      MetricsSystem.startSinks(getClusterConf().getString(PropertyKey.METRICS_CONF_FILE));
       MetricsHeartbeatContext.addHeartbeat(getClientContext(), masterInquireClient);
     }
     mFileSystemMasterClientPool = new FileSystemMasterClientPool(mMasterClientContext);

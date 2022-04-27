@@ -12,6 +12,7 @@
 package alluxio.master.journal.ufs;
 
 import alluxio.RuntimeConstants;
+import alluxio.collections.Pair;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
 import alluxio.exception.ExceptionMessage;
@@ -30,7 +31,6 @@ import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.io.ByteStreams;
-import com.google.common.io.Closer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,6 +109,10 @@ final class UfsJournalLogWriter implements JournalWriter {
     }
     mGarbageCollector = new UfsJournalGarbageCollector(mJournal);
     mEntriesToFlush = new ArrayDeque<>();
+  }
+
+  public void write(Pair<JournalEntry, Long> entryPair) throws JournalClosedException, IOException {
+    write(entryPair.getFirst());
   }
 
   public synchronized void write(JournalEntry entry) throws IOException, JournalClosedException {
@@ -394,13 +398,19 @@ final class UfsJournalLogWriter implements JournalWriter {
   }
 
   @Override
-  public synchronized void close() throws IOException {
-    Closer closer = Closer.create();
-    if (mJournalOutputStream != null) {
-      closer.register(mJournalOutputStream);
+  public synchronized void close() {
+    if (mClosed) {
+      return;
     }
-    closer.register(mGarbageCollector);
-    closer.close();
+    mGarbageCollector.close();
+    if (mJournalOutputStream != null) {
+      try {
+        mJournalOutputStream.close();
+      } catch (Throwable error) {
+        LOG.warn(String.format("Failed to close underlying UFS journal stream for: %s", mJournal),
+            error);
+      }
+    }
     mClosed = true;
   }
 

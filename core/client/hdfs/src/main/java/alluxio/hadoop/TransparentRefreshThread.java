@@ -13,8 +13,6 @@ package alluxio.hadoop;
 
 import alluxio.client.file.FileSystem;
 import alluxio.exception.AlluxioException;
-import alluxio.exception.InvalidPathException;
-import alluxio.util.io.PathUtils;
 import alluxio.wire.MountPointInfo;
 
 import com.google.common.base.Preconditions;

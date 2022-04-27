@@ -119,6 +119,8 @@ public class InodeTreePersistentState implements Journaled {
 
   private final BucketCounter mBucketCounter;
 
+  private InodeDirectory mRoot;
+
   /**
    * @param inodeStore file store which holds inode metadata
    * @param lockManager manager for inode locks
@@ -131,7 +133,7 @@ public class InodeTreePersistentState implements Journaled {
     mInodeLockManager = lockManager;
     mTtlBuckets = ttlBucketList;
     mBucketCounter = new BucketCounter(
-        ServerConfiguration.getList(MASTER_METRICS_FILE_SIZE_DISTRIBUTION_BUCKETS, ",")
+        ServerConfiguration.getList(MASTER_METRICS_FILE_SIZE_DISTRIBUTION_BUCKETS)
             .stream().map(FormatUtils::parseSpaceSize).collect(Collectors.toList()));
     mRetryCacheEnabled =
         ServerConfiguration.getBoolean(MASTER_FILE_SYSTEM_OPERATION_RETRY_CACHE_ENABLED);
@@ -171,7 +173,10 @@ public class InodeTreePersistentState implements Journaled {
    * @return the root of the inode tree
    */
   public InodeDirectory getRoot() {
-    return mInodeStore.get(0).map(Inode::asDirectory).orElse(null);
+    if (mRoot == null) {
+      mRoot = mInodeStore.get(0).map(Inode::asDirectory).orElse(null);
+    }
+    return mRoot;
   }
 
   /**
@@ -637,6 +642,7 @@ public class InodeTreePersistentState implements Journaled {
       mToBePersistedIds.clear();
 
       updateToBePersistedIds(inode);
+      mRoot = null;
       return;
     }
     // inode should be added to the inode store before getting added to its parent list, because it

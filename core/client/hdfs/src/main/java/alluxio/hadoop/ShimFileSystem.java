@@ -115,7 +115,7 @@ public class ShimFileSystem extends AbstractFileSystem {
     }
     if (mAlluxioConf.isSet(TxPropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST)) {
       List<String> prefixes =
-          mAlluxioConf.getList(TxPropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST, ",");
+          mAlluxioConf.getList(TxPropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST);
       try {
         for (String prefix : prefixes) {
           prefix = prefix.trim();
@@ -164,7 +164,7 @@ public class ShimFileSystem extends AbstractFileSystem {
   private Configuration getByPassFsImplConf(AlluxioConfiguration alluxioConf) throws IOException {
     if (alluxioConf.isSet(TxPropertyKey.USER_SHIMFS_BYPASS_UFS_IMPL_LIST)) {
       List<String> implList =
-          mAlluxioConf.getList(TxPropertyKey.USER_SHIMFS_BYPASS_UFS_IMPL_LIST, ",");
+          mAlluxioConf.getList(TxPropertyKey.USER_SHIMFS_BYPASS_UFS_IMPL_LIST);
       Configuration conf = new Configuration();
       for (String impl : implList) {
         List<String> fsImpl = Lists.newArrayList(Splitter.on(":").trimResults().omitEmptyStrings()
@@ -355,12 +355,12 @@ public class ShimFileSystem extends AbstractFileSystem {
     Path path = getFullPath(getUri(), file.getPath());
     if (!pathByPassed(path)) {
       try {
-        return super.getFileBlockLocations(path, start, len);
+        return super.getFileBlockLocations(file, start, len);
       } catch (UnavailableException e) {
         mFallbackManager.markFallBack(this);
       }
     }
-    return mByPassFs.getFileBlockLocations(path, start, len);
+    return mByPassFs.getFileBlockLocations(file, start, len);
   }
 
   public boolean setReplication(Path path, short replication) throws IOException {

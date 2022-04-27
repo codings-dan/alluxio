@@ -11,6 +11,7 @@
 
 package alluxio.master.journal;
 
+import alluxio.collections.Pair;
 import alluxio.exception.JournalClosedException;
 import alluxio.proto.journal.Journal.JournalEntry;
 
@@ -27,7 +28,11 @@ public interface JournalWriter extends Closeable {
    *
    * @param entry the journal entry to write
    */
-  void write(JournalEntry entry) throws IOException, JournalClosedException;
+  void write(Pair<JournalEntry, Long> entry) throws IOException, JournalClosedException;
+
+  default void write(JournalEntry entry) throws IOException, JournalClosedException {
+    write(AsyncJournalWriter.createEntryWarp(entry));
+  }
 
   /**
    * Flushes all the entries written to the underlying storage.

@@ -258,7 +258,7 @@ public final class HdfsInodeAttributesProviderTest {
     InstancedConfiguration instancedConfiguration =
         new InstancedConfiguration(new AlluxioProperties());
     String supergroup =
-        instancedConfiguration.get(PropertyKey.SECURITY_AUTHORIZATION_PERMISSION_SUPERGROUP);
+        instancedConfiguration.getString(PropertyKey.SECURITY_AUTHORIZATION_PERMISSION_SUPERGROUP);
     FsAction access = FsAction.getFsAction(bits.toString());
     int ancestorIndex = inodes.size() - 2;
 //    verify(mHadoopEnforcer).checkPermission(eq(fsOwner), eq(supergroup), matchUgi(user, groups),
@@ -278,7 +278,7 @@ public final class HdfsInodeAttributesProviderTest {
     String fsOwner = "user1";
     InstancedConfiguration instancedConfiguration =
         new InstancedConfiguration(new AlluxioProperties());
-    String supergroup = instancedConfiguration.get(
+    String supergroup = instancedConfiguration.getString(
         alluxio.conf.PropertyKey.SECURITY_AUTHORIZATION_PERMISSION_SUPERGROUP);
     FsAction access = FsAction.getFsAction(bits.toString());
     int ancestorIndex = inodes.size() - 2;

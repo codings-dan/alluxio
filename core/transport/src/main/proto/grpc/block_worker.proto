@@ -21,6 +21,7 @@ service BlockWorker {
   rpc CreateLocalBlock (stream CreateLocalBlockRequest) returns (stream CreateLocalBlockResponse);
   rpc AsyncCache (AsyncCacheRequest) returns (AsyncCacheResponse);
   rpc Cache (CacheRequest) returns (CacheResponse);
+  rpc Caches (CachesRequest) returns (CachesResponse);
   rpc RemoveBlock (RemoveBlockRequest) returns (RemoveBlockResponse);
   rpc MoveBlock (MoveBlockRequest) returns (MoveBlockResponse);
 
@@ -131,11 +132,28 @@ message CacheRequest {
   optional bool async = 6;
 }
 
+message CacheBlockInfo {
+  optional int64 block_id = 1;
+  // TODO(calvin): source host and port should be replace with WorkerNetAddress
+  optional alluxio.proto.dataserver.OpenUfsBlockOptions open_ufs_block_options = 2;
+  optional int64 length = 3;
+}
+
+message CachesRequest {
+  repeated CacheBlockInfo cacheBlockInfo = 1;
+  optional bool async = 2;
+  optional string source_host = 3;
+  optional int32 source_port = 4;
+}
+
 // Response for an async cache request
 message AsyncCacheResponse {}
 
 // Response for an async cache request
 message CacheResponse {}
+
+// Response for an async cache request
+message CachesResponse {}
 
 // next available id: 3
 message OpenLocalBlockRequest {

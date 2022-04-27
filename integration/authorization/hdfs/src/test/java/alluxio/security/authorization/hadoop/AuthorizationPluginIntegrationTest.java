@@ -132,7 +132,7 @@ public final class AuthorizationPluginIntegrationTest {
     conf.merge(ImmutableMap.of(DFS_NAMENODE_INODE_ATTRIBUTES_PROVIDER_KEY,
         DummyHdfsProvider.class.getName()), Source.RUNTIME);
     GroupMappingServiceTestUtils.resetCache();
-    mUnderFS = ServerConfiguration.get(PropertyKey.MASTER_MOUNT_TABLE_ROOT_UFS);
+    mUnderFS = ServerConfiguration.getString(PropertyKey.MASTER_MOUNT_TABLE_ROOT_UFS);
     mJournalFolder = mTestFolder.newFolder().getAbsolutePath();
     startServices();
   }

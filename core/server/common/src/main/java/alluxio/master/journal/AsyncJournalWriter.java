@@ -14,10 +14,12 @@ package alluxio.master.journal;
 import alluxio.Constants;
 import alluxio.annotation.SuppressFBWarnings;
 import alluxio.collections.ConcurrentHashSet;
+import alluxio.collections.Pair;
 import alluxio.concurrent.ForkJoinPoolHelper;
 import alluxio.concurrent.jsr.ForkJoinPool;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.JournalClosedException;
 import alluxio.exception.status.AlluxioStatusException;
 import alluxio.master.journal.sink.JournalSink;
@@ -115,7 +117,7 @@ public final class AsyncJournalWriter {
   }
 
   private final JournalWriter mJournalWriter;
-  private final ConcurrentLinkedQueue<JournalEntry> mQueue;
+  private final ConcurrentLinkedQueue<Pair<JournalEntry, Long>> mQueue;
   /** Represents the count of entries added to the journal queue. */
   private final AtomicLong mCounter;
   /** Represents the count of entries flushed to the journal writer. */
@@ -148,15 +150,24 @@ public final class AsyncJournalWriter {
   private Thread mFlushThread = new Thread(this::doFlush,
       "AsyncJournalWriterThread-" + mJournalName);
 
+  private Thread mNotifyThread = new Thread(this::doNotify,
+      "AsyncJournalNotifyThread-" + mJournalName);
+
   /**
    * Used to give permits to flush thread to start processing immediately.
    */
   private final Semaphore mFlushSemaphore = new Semaphore(0, true);
+  /**
+   * Used to give permits to notify thread to start processing immediately.
+   */
+  private final Semaphore mNotifySemaphore = new Semaphore(0, true);
 
   /**
    * Control flag that is used to instruct flush thread to exit.
    */
   private volatile boolean mStopFlushing = false;
+  private volatile boolean mStopNotifying = false;
+  private final boolean mAsyncNotify;
 
   /** A supplier of journal sinks for this journal writer. */
   private final Supplier<Set<JournalSink>> mJournalSinks;
@@ -176,8 +187,10 @@ public final class AsyncJournalWriter {
     mFlushBatchTimeNs = TimeUnit.NANOSECONDS.convert(
         ServerConfiguration.getMs(PropertyKey.MASTER_JOURNAL_FLUSH_BATCH_TIME_MS),
         TimeUnit.MILLISECONDS);
+    mAsyncNotify = ServerConfiguration.getBoolean(TxPropertyKey.MASTER_JOURNAL_ASYNC_NOTIFY);
     mJournalSinks = journalSinks;
     mFlushThread.start();
+    mNotifyThread.start();
   }
 
   /**
@@ -191,6 +204,12 @@ public final class AsyncJournalWriter {
       String journalName) {
     this(journalWriter, journalSinks);
     mJournalName = journalName;
+  }
+
+  public static Pair<JournalEntry, Long> createEntryWarp(JournalEntry entry) {
+    Preconditions.checkState(entry.getAllFields().size() <= 2,
+        "Raft journal entries should never set multiple fields, but found %s", entry);
+    return new Pair<JournalEntry, Long>(entry, (long) entry.getSerializedSize());
   }
 
   /**
@@ -220,7 +239,7 @@ public final class AsyncJournalWriter {
      * equal to the counter for the entries in the queue.
      */
     mCounter.incrementAndGet();
-    mQueue.offer(entry);
+    mQueue.offer(createEntryWarp(entry));
     return mCounter.get();
   }
 
@@ -237,16 +256,20 @@ public final class AsyncJournalWriter {
   protected void stop() {
     // Set termination flag.
     mStopFlushing = true;
+    //  Stop Notify In Writing Remaining Requests
     // Give a permit for flush thread to run, in case it was blocked on permit.
     mFlushSemaphore.release();
+    mNotifySemaphore.release();
 
     try {
       mFlushThread.join();
+      mNotifyThread.join();
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
       return;
     } finally {
       mFlushThread = null;
+      mNotifyThread = null;
       // Try to reacquire the permit.
       mFlushSemaphore.tryAcquire();
     }
@@ -254,14 +277,17 @@ public final class AsyncJournalWriter {
 
   @VisibleForTesting
   protected void start() {
-    if (mFlushThread != null) {
+    if (mFlushThread != null || mNotifyThread != null) {
       close();
     }
     // Create a new thread.
-    mFlushThread = new Thread(this::doFlush);
+    mFlushThread = new Thread(this::doFlush, "AsyncJournalWriterThread-" + mJournalName);
+    mNotifyThread = new Thread(this::doNotify, "AsyncJournalNotifyThread-" + mJournalName);
     // Reset termination flag before starting the new thread.
     mStopFlushing = false;
+    mStopNotifying = false;
     mFlushThread.start();
+    mNotifyThread.start();
   }
 
   /**
@@ -298,13 +324,13 @@ public final class AsyncJournalWriter {
         // Write pending entries to journal.
         while (!mQueue.isEmpty()) {
           // Get, but do not remove, the head entry.
-          JournalEntry entry = mQueue.peek();
-          if (entry == null) {
+          Pair<JournalEntry, Long> entryPair = mQueue.peek();
+          if (entryPair == null) {
             // No more entries in the queue. Break write session.
             break;
           }
-          mJournalWriter.write(entry);
-          JournalUtils.sinkAppend(mJournalSinks, entry);
+          mJournalWriter.write(entryPair);
+          JournalUtils.sinkAppend(mJournalSinks, entryPair.getFirst());
           // Remove the head entry, after the entry was successfully written.
           mQueue.poll();
           mWriteCounter++;
@@ -326,13 +352,17 @@ public final class AsyncJournalWriter {
           mFlushCounter.set(mWriteCounter);
         }
 
-        // Notify tickets that have been served to wake up.
-        Iterator<FlushTicket> ticketIterator = mTicketSet.iterator();
-        while (ticketIterator.hasNext()) {
-          FlushTicket ticket = ticketIterator.next();
-          if (ticket.getTargetCounter() <= mFlushCounter.get()) {
-            ticket.setCompleted();
-            ticketIterator.remove();
+        if (mAsyncNotify) {
+          mNotifySemaphore.release();
+        } else {
+          // Notify tickets that have been served to wake up.
+          Iterator<FlushTicket> ticketIterator = mTicketSet.iterator();
+          while (ticketIterator.hasNext()) {
+            FlushTicket ticket = ticketIterator.next();
+            if (ticket.getTargetCounter() <= mFlushCounter.get()) {
+              ticket.setCompleted();
+              ticketIterator.remove();
+            }
           }
         }
       } catch (IOException | JournalClosedException exc) {
@@ -342,15 +372,57 @@ public final class AsyncJournalWriter {
         Metrics.JOURNAL_FLUSH_FAILURE.inc();
         // Release only tickets that have been flushed. Fail the rest.
         Iterator<FlushTicket> ticketIterator = mTicketSet.iterator();
-        while (ticketIterator.hasNext()) {
-          FlushTicket ticket = ticketIterator.next();
-          ticketIterator.remove();
-          if (ticket.getTargetCounter() <= mFlushCounter.get()) {
-            ticket.setCompleted();
-          } else {
-            ticket.setError(exc);
+        if (mAsyncNotify) {
+          while (ticketIterator.hasNext()) {
+            FlushTicket ticket = ticketIterator.next();
+            if (ticket.getTargetCounter() > mFlushCounter.get()) {
+              ticketIterator.remove();
+              ticket.setError(exc);
+            }
+          }
+        } else {
+          while (ticketIterator.hasNext()) {
+            FlushTicket ticket = ticketIterator.next();
+            ticketIterator.remove();
+            if (ticket.getTargetCounter() <= mFlushCounter.get()) {
+              ticket.setCompleted();
+            } else {
+              ticket.setError(exc);
+            }
           }
         }
+      }
+    }
+    // Ensure that the doNotify thread can get the latest mFlushCounter value,
+    // to ensure that all flushed requests can be setComplete();
+    mStopNotifying = true;
+    mNotifySemaphore.release();
+  }
+
+  private void notifyCompleted() {
+    Iterator<FlushTicket> ticketIterator = mTicketSet.iterator();
+    while (ticketIterator.hasNext()) {
+      FlushTicket ticket = ticketIterator.next();
+      if (ticket.getTargetCounter() <= mFlushCounter.get()) {
+        ticket.setCompleted();
+        ticketIterator.remove();
+      }
+    }
+  }
+
+  private void doNotify() {
+    if (mAsyncNotify) {
+      // Notify tickets that have been served to wake up.
+      while (!mStopNotifying) {
+        try {
+          mNotifySemaphore.acquire();
+        } catch (InterruptedException ie) {
+          continue;
+        }
+        notifyCompleted();
+      }
+      while (mNotifySemaphore.tryAcquire()) {
+        notifyCompleted();
       }
     }
   }

@@ -44,7 +44,8 @@ public final class GrpcExecutors {
           THREAD_STOP_MS, TimeUnit.MILLISECONDS,
           new UniqueBlockingQueue<>(ServerConfiguration.getInt(
               PropertyKey.WORKER_NETWORK_ASYNC_CACHE_MANAGER_QUEUE_MAX)),
-          ThreadFactoryUtils.build("CacheManagerExecutor-%d", true)));
+          ThreadFactoryUtils.build("CacheManagerExecutor-%d", true),
+          new ThreadPoolExecutor.CallerRunsPolicy()));
 
   private static final ThreadPoolExecutor BLOCK_READER_THREAD_POOL_EXECUTOR =
       new ThreadPoolExecutor(THREADS_MIN, ServerConfiguration.getInt(

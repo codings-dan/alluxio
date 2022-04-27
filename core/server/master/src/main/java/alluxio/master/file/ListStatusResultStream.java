@@ -19,6 +19,7 @@ import com.google.common.base.Preconditions;
 import io.grpc.stub.StreamObserver;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import javax.annotation.concurrent.ThreadSafe;
@@ -47,7 +48,7 @@ public class ListStatusResultStream implements ResultStream<FileInfo> {
     Preconditions.checkArgument(batchSize > 0);
     mBatchSize = batchSize;
     mClientObserver = clientObserver;
-    mInfos = new ArrayList<>();
+    mInfos = Collections.synchronizedList(new ArrayList<>());
   }
 
   @Override

@@ -13,6 +13,7 @@ package alluxio.security.authentication;
 
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.PropertyKey;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.status.AlluxioStatusException;
 import alluxio.exception.status.UnauthenticatedException;
 import alluxio.grpc.ChannelAuthenticationScheme;
@@ -147,7 +148,7 @@ public class ChannelAuthenticator {
         return ChannelAuthenticationScheme.CUSTOM;
       default:
         throw new UnauthenticatedException(String.format(
-            "Configured authentication type is not supported: %s", authType.getAuthName()));
+            "Configured authentication type is not supported: %s", authType));
     }
   }
 
@@ -164,9 +165,26 @@ public class ChannelAuthenticator {
       ChannelAuthenticationScheme authScheme, Subject subject) throws UnauthenticatedException {
     switch (authScheme) {
       case SIMPLE:
-      case CUSTOM:
         return new alluxio.security.authentication.plain.SaslClientHandlerPlain(mParentSubject,
             mConfiguration);
+      case CUSTOM:
+        if (!mConfiguration.isSetByUser(
+            TxPropertyKey.SECURITY_AUTHENTICATION_CUSTOM_SASL_CLIENT_CLASS)) {
+          return new alluxio.security.authentication.plain.SaslClientHandlerPlain(mParentSubject,
+                  mConfiguration);
+        }
+        Class clazz = mConfiguration.getClass(
+            TxPropertyKey.SECURITY_AUTHENTICATION_CUSTOM_SASL_CLIENT_CLASS);
+        try {
+          return (SaslClientHandler) clazz.getConstructor(
+                  new Class[] {Subject.class, AlluxioConfiguration.class})
+              .newInstance(mParentSubject, mConfiguration);
+        } catch (ReflectiveOperationException e) {
+          throw new IllegalStateException(
+                  TxPropertyKey.SECURITY_AUTHENTICATION_CUSTOM_SASL_CLIENT_CLASS.getName()
+                          + " configured to invalid class "
+                          + clazz + ". Cannot create SaslClientHandler.", e);
+        }
       default:
         throw new UnauthenticatedException(
             String.format("Channel authentication scheme not supported: %s", authScheme.name()));
