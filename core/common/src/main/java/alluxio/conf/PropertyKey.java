@@ -1026,7 +1026,7 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .build();
   public static final PropertyKey UNDERFS_HDFS_PREFIXES =
       listBuilder(Name.UNDERFS_HDFS_PREFIXES)
-          .setDefaultValue("hdfs://,glusterfs:///,viewfs://")
+          .setDefaultValue("hdfs://,glusterfs:///")
           .setDescription("Optionally, specify which prefixes should run through the HDFS "
               + "implementation of UnderFileSystem. The delimiter is any whitespace "
               + "and/or ','.")
