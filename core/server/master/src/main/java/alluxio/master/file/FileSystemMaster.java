@@ -61,6 +61,7 @@ import alluxio.wire.UfsInfo;
 import alluxio.wire.WorkerInfo;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -649,7 +650,9 @@ public interface FileSystemMaster extends Master {
    * @param journalId the journal id of client
    * @return the client command result
    */
-  ClientCommand commandHeartbeat(long clientId, long metadataCacheSize, long journalId);
+  default ClientCommand commandHeartbeat(long clientId, long metadataCacheSize, long journalId) {
+    return ClientCommand.getDefaultInstance();
+  }
 
   /**
    * Register client to master.
@@ -657,25 +660,32 @@ public interface FileSystemMaster extends Master {
    * @param startTime the start time of client
    *
    */
-  void clientRegister(long clientId, long startTime)
-      throws NotFoundException;
+  default void clientRegister(long clientId, long startTime)
+      throws NotFoundException {
+  }
 
   /**
    * Gets client id.
    * @param clientIdentifier the client net address information
    * @return the client id
    */
-  long getClientId(ClientIdentifier clientIdentifier);
+  default long getClientId(ClientIdentifier clientIdentifier) {
+    return -1;
+  }
 
   /**
    * Gets normal client information.
    * @return the normal client information
    */
-  List<ClientInfo> getNormalClientInfoList();
+  default List<ClientInfo> getNormalClientInfoList() {
+    return new ArrayList<>();
+  }
 
   /**
    * Gets lost client information.
    * @return the lost client information
    */
-  List<ClientInfo> getLostClientInfoList();
+  default List<ClientInfo> getLostClientInfoList() {
+    return new ArrayList<>();
+  }
 }

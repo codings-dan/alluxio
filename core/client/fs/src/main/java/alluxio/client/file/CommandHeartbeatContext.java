@@ -112,7 +112,7 @@ public class CommandHeartbeatContext {
         cmd = mCommandClientMasterSync.heartbeat(mClientId,
             ((MetadataCachingBaseFileSystem) mFs).getMetadataCacheSize(), mJournalId);
       } else {
-        mCommandClientMasterSync.heartbeat(mClientId, INITIAL_CODE, mJournalId);
+        cmd = mCommandClientMasterSync.heartbeat(mClientId, INITIAL_CODE, mJournalId);
       }
       handleCommand(cmd);
       mHaveHeartbeatSuccessful = true;
@@ -169,9 +169,10 @@ public class CommandHeartbeatContext {
 
   private void handleRegisterCommand() {
     try {
-      registerClient();
-      LOG.info("Register client successfully, with the host {} and client id {}",
-          getHost(mConf), mClientId);
+      if (registerClient()) {
+        LOG.info("Register client successfully, with the host {} and client id {}",
+            getHost(mConf), mClientId);
+      }
     } catch (AlluxioStatusException e) {
       LOG.warn("Failed to register the client {} to master: ", getHost(mConf));
       e.printStackTrace();
@@ -195,7 +196,7 @@ public class CommandHeartbeatContext {
     ((MetadataCachingBaseFileSystem) mFs).updateMetadataCacheAll();
   }
 
-  private void registerClient() throws AlluxioStatusException {
+  private boolean registerClient() throws AlluxioStatusException {
     if (mHaveHeartbeatSuccessful) {
       String host = getHost(mConf);
       String containerHost =
@@ -203,9 +204,11 @@ public class CommandHeartbeatContext {
       ClientIdentifier clientIdentifier = new ClientIdentifier(host, containerHost, mPid);
       mClientId = mCommandClientMasterSync.getClientId(clientIdentifier);
       mCommandClientMasterSync.register(mClientId, mStartTime);
+      return true;
     } else {
       LOG.info("The client {} has not heartbeat successfully, "
           + "will register later.", getHost(mConf));
+      return false;
     }
   }
 

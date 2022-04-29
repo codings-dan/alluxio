@@ -79,9 +79,9 @@ enum CommandType {
 }
 
 enum ClientCommandType {
-  CLIENT_REGISTER = 0; // Ask the client to re-register
-  CLIENT_CLEAR = 1;
-  CLIENT_NOTHING = 2;
+  CLIENT_NOTHING = 0;
+  CLIENT_REGISTER = 1; // Ask the client to re-register
+  CLIENT_CLEAR = 2;
 }
 
 message ConfigProperty {

@@ -14,10 +14,12 @@ package alluxio.client.file;
 import alluxio.ClientContext;
 import alluxio.exception.status.AlluxioStatusException;
 import alluxio.grpc.ClientCommand;
+import alluxio.grpc.ClientCommandType;
 import alluxio.master.MasterClientContext;
 import alluxio.master.MasterInquireClient;
 import alluxio.wire.ClientIdentifier;
 
+import io.grpc.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +68,13 @@ public final class CommandClientMasterSync {
   public synchronized ClientCommand heartbeat(long clientId, long metadataSize, long journalId)
       throws AlluxioStatusException {
     loadConfiguration();
-    return mMasterClient.heartbeat(clientId, metadataSize, journalId);
+    ClientCommand cmd;
+    try {
+      cmd = mMasterClient.heartbeat(clientId, metadataSize, journalId);
+    } catch (AlluxioStatusException e) {
+      cmd = handleUnimplementedException(e);
+    }
+    return cmd;
   }
 
   public synchronized long getClientId(ClientIdentifier clientIdentifier)
@@ -112,6 +120,18 @@ public final class CommandClientMasterSync {
   private void loadConf() throws AlluxioStatusException {
     InetSocketAddress masterAddr = mInquireClient.getPrimaryRpcAddress();
     mContext.loadConf(masterAddr, true, false);
+  }
+
+  private ClientCommand handleUnimplementedException(AlluxioStatusException e)
+      throws AlluxioStatusException {
+    if (e.getStatus().getCode() == Status.UNIMPLEMENTED.getCode()) {
+      LOG.debug("The master don't have the client command heartbeat interface, please change"
+          + " the client or master code.");
+      return ClientCommand.newBuilder()
+          .setClientCommandType(ClientCommandType.CLIENT_NOTHING).build();
+    } else {
+      throw e;
+    }
   }
 }
 

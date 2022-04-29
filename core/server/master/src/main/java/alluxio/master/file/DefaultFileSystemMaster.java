@@ -23,8 +23,6 @@ import alluxio.Server;
 import alluxio.client.job.JobMasterClient;
 import alluxio.client.job.JobMasterClientPool;
 import alluxio.clock.SystemClock;
-import alluxio.collections.IndexDefinition;
-import alluxio.collections.IndexedSet;
 import alluxio.collections.Pair;
 import alluxio.collections.PrefixList;
 import alluxio.conf.PropertyKey;
@@ -52,8 +50,6 @@ import alluxio.exception.status.PermissionDeniedException;
 import alluxio.exception.status.ResourceExhaustedException;
 import alluxio.exception.status.UnavailableException;
 import alluxio.file.options.DescendantType;
-import alluxio.grpc.ClientCommand;
-import alluxio.grpc.ClientCommandType;
 import alluxio.grpc.DeletePOptions;
 import alluxio.grpc.FileSystemMasterCommonPOptions;
 import alluxio.grpc.GetStatusPOptions;
@@ -68,7 +64,6 @@ import alluxio.grpc.SetAclAction;
 import alluxio.grpc.SetAttributePOptions;
 import alluxio.grpc.TtlAction;
 import alluxio.heartbeat.HeartbeatContext;
-import alluxio.heartbeat.HeartbeatExecutor;
 import alluxio.heartbeat.HeartbeatThread;
 import alluxio.job.plan.persist.PersistConfig;
 import alluxio.job.wire.JobInfo;
@@ -134,7 +129,6 @@ import alluxio.metrics.MetricInfo;
 import alluxio.metrics.MetricKey;
 import alluxio.metrics.MetricsSystem;
 import alluxio.metrics.TimeSeries;
-import alluxio.metrics.TxMetricKey;
 import alluxio.proto.journal.File;
 import alluxio.proto.journal.File.NewBlockEntry;
 import alluxio.proto.journal.File.RenameEntry;
@@ -175,8 +169,6 @@ import alluxio.util.io.PathUtils;
 import alluxio.util.proto.ProtoUtils;
 import alluxio.wire.BlockInfo;
 import alluxio.wire.BlockLocation;
-import alluxio.wire.ClientInfo;
-import alluxio.wire.ClientIdentifier;
 import alluxio.wire.CommandType;
 import alluxio.wire.FileBlockInfo;
 import alluxio.wire.FileInfo;
@@ -244,22 +236,6 @@ public class DefaultFileSystemMaster extends CoreMaster
 
   /** The number of threads to use in the {@link #mPersistCheckerPool}. */
   private static final int PERSIST_CHECKER_POOL_THREADS = 128;
-
-  private static final IndexDefinition<ClientInfo, Long> ID_INDEX =
-      new IndexDefinition<ClientInfo, Long>(true) {
-        @Override
-        public Long getFieldValue(ClientInfo o) {
-          return o.getId();
-        }
-      };
-
-  private static final IndexDefinition<ClientInfo, ClientIdentifier> IDENTIFIER_INDEX =
-      new IndexDefinition<ClientInfo, ClientIdentifier>(true) {
-        @Override
-        public ClientIdentifier getFieldValue(ClientInfo o) {
-          return o.getClientIdentifier();
-        }
-      };
 
   /**
    * Locking in DefaultFileSystemMaster
@@ -454,12 +430,6 @@ public class DefaultFileSystemMaster extends CoreMaster
       1, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
       ThreadFactoryUtils.build("alluxio-ufs-active-sync-%d", false));
   private HeartbeatThread mReplicationCheckHeartbeatThread;
-  private final IndexedSet<ClientInfo> mClients =
-      new IndexedSet<>(ID_INDEX, IDENTIFIER_INDEX);
-  private final IndexedSet<ClientInfo> mLostClients =
-      new IndexedSet<>(ID_INDEX, IDENTIFIER_INDEX);
-  private final IndexedSet<ClientInfo> mTempClients =
-      new IndexedSet<>(ID_INDEX, IDENTIFIER_INDEX);
 
   /**
    * Creates a new instance of {@link DefaultFileSystemMaster}.
@@ -553,8 +523,6 @@ public class DefaultFileSystemMaster extends CoreMaster
     Metrics.registerGauges(mUfsManager, mInodeTree);
 
     mUriTranslator = UriTranslator.Factory.create(this, mMountTable, mInodeTree);
-    MetricsSystem.registerGaugeIfAbsent(TxMetricKey.CLUSTER_REGISTER_CLIENTS.getName(),
-        mClients::size);
     mSlowListOperationThreshold = ServerConfiguration.getMs(
         TxPropertyKey.MASTER_SLOW_LIST_OPERATION_THRESHOLD);
     MetricsSystem.registerCachedGaugeIfAbsent(
@@ -755,11 +723,6 @@ public class DefaultFileSystemMaster extends CoreMaster
               new TimeSeriesRecorder(),
               ServerConfiguration.getMs(PropertyKey.MASTER_METRICS_TIME_SERIES_INTERVAL),
               ServerConfiguration.global(), mMasterContext.getUserState()));
-      getExecutorService().submit(new HeartbeatThread(
-          HeartbeatContext.MASTER_LOST_CLIENT_DETECTION,
-          new LostClientDetectionHeartbeatExecutor(),
-          (int) ServerConfiguration.getMs(TxPropertyKey.MASTER_LOST_CLIENT_DETECTION_INTERVAL),
-          ServerConfiguration.global(), mMasterContext.getUserState()));
       if (ServerConfiguration.getBoolean(PropertyKey.MASTER_AUDIT_LOGGING_ENABLED)) {
         mAsyncAuditLogWriter = new AsyncUserAccessAuditLogWriter("AUDIT_LOG");
         mAsyncAuditLogWriter.start();
@@ -5102,169 +5065,5 @@ public class DefaultFileSystemMaster extends CoreMaster
   @Override
   public void decommissionWorkers(final Set<String> excludedWorkerSet, boolean addOnly) {
     mBlockMaster.decommissionWorkers(excludedWorkerSet, addOnly);
-  }
-
-  @Override
-  public ClientCommand commandHeartbeat(long clientId, long metadataCacheSize, long journalId)  {
-    ClientInfo client = mClients.getFirstByField(ID_INDEX, clientId);
-    ClientCommand.Builder builder = ClientCommand.newBuilder();
-    if (client == null) {
-      LOG.warn("Master Can't find the client with id {} ", clientId);
-      return builder.setClientCommandType(ClientCommandType.CLIENT_REGISTER).build();
-    }
-    client.setMetadataCacheSize(metadataCacheSize);
-    client.setLastContactMs(System.currentTimeMillis());
-    // Get the journal index of the leader node. In most circumstances,
-    // the index of each node is same. If they are inconsistent, the largest
-    // journal Index belongs to the leader node.
-    long id = mMasterContext.getJournalSystem().getCurrentSequenceNumbers()
-        .values().stream().max(Long::compare).orElse(0L);
-    if (journalId != id) {
-      return builder.setClientCommandType(ClientCommandType.CLIENT_CLEAR).setJournalId(id).build();
-    } else {
-      return builder.setClientCommandType(ClientCommandType.CLIENT_NOTHING).build();
-    }
-  }
-
-  @Override
-  public long getClientId(ClientIdentifier clientIdentifier) {
-    ClientInfo existingClients = mClients.getFirstByField(IDENTIFIER_INDEX, clientIdentifier);
-    if (existingClients != null) {
-      // This client address is already mapped to a client id.
-      long oldClientId = existingClients.getId();
-      LOG.warn("The client {} already exists as id {}.", clientIdentifier, oldClientId);
-      return oldClientId;
-    }
-
-    existingClients = findUnregisteredClient(clientIdentifier);
-    if (existingClients != null) {
-      return existingClients.getId();
-    }
-
-    // Generate a new client id.
-    long clientId = IdUtils.getRandomNonNegativeLong();
-    while (!mTempClients.add(new ClientInfo(clientId, clientIdentifier))) {
-      clientId = IdUtils.getRandomNonNegativeLong();
-    }
-
-    LOG.info("getClientId(): ClientIdentifier: {} id: {}", clientIdentifier, clientId);
-    return clientId;
-  }
-
-  /**
-   * Find a client which is considered lost or just gets its id.
-   * @param clientIdentifier the address used to find a client
-   * @return a {@link ClientInfo} which is presented in master but not registered,
-   *         or null if not client is found.
-   */
-  @Nullable
-  private ClientInfo findUnregisteredClient(ClientIdentifier clientIdentifier) {
-    for (IndexedSet<ClientInfo> clients: Arrays.asList(mTempClients, mLostClients)) {
-      ClientInfo client = clients.getFirstByField(IDENTIFIER_INDEX, clientIdentifier);
-      if (client != null) {
-        return client;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Find a client which is considered lost or just gets its id.
-   * @param clientId the id used to find a client
-   * @return a {@link ClientInfo} which is presented in master but not registered,
-   *         or null if not client is found.
-   */
-  @Nullable
-  private ClientInfo findUnregisteredClient(long clientId) {
-    for (IndexedSet<ClientInfo> clients: Arrays.asList(mTempClients, mLostClients)) {
-      ClientInfo client = clients.getFirstByField(ID_INDEX, clientId);
-      if (client != null) {
-        return client;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Re-register a lost client or complete registration after getting a client id.
-   * This method requires no locking on {@link ClientInfo} because it is only
-   * reading final fields.
-   *
-   * @param clientId the client id to register
-   */
-  @Nullable
-  private ClientInfo recordClientRegistration(long clientId) {
-    for (IndexedSet<ClientInfo> clients: Arrays.asList(mTempClients, mLostClients)) {
-      ClientInfo client = clients.getFirstByField(ID_INDEX, clientId);
-      if (client == null) {
-        continue;
-      }
-      mClients.add(client);
-      clients.remove(client);
-      LOG.warn("A lost client {} has requested its old id {}.",
-          client.getClientIdentifier(), client.getId());
-      return client;
-    }
-    return null;
-  }
-
-  @Override
-  public void clientRegister(long clientId, long startTime)
-      throws NotFoundException {
-    ClientInfo client = mClients.getFirstByField(ID_INDEX, clientId);
-    if (client == null) {
-      client = findUnregisteredClient(clientId);
-    }
-    if (client == null) {
-      throw new NotFoundException(ExceptionMessage.NO_CLIENT_FOUND.getMessage(clientId));
-    }
-    recordClientRegistration(clientId);
-    // Update the TS at the end of the process
-    client.setLastContactMs(System.currentTimeMillis());
-    client.setStartTimeMs(startTime);
-
-    LOG.info("registerClient(): {}", client);
-  }
-
-  @Override
-  public List<ClientInfo> getNormalClientInfoList()  {
-    return new ArrayList<>(mClients);
-  }
-
-  @Override
-  public List<ClientInfo> getLostClientInfoList() {
-    return new ArrayList<>(mLostClients);
-  }
-
-  /**
-   * Lost client periodic check.
-   */
-  public final class LostClientDetectionHeartbeatExecutor implements HeartbeatExecutor {
-
-    /**
-     * Constructs a new {@link LostClientDetectionHeartbeatExecutor}.
-     */
-    public LostClientDetectionHeartbeatExecutor() {}
-
-    @Override
-    public void heartbeat() {
-      long masterClientTimeoutMs =
-          ServerConfiguration.getMs(TxPropertyKey.MASTER_CLIENT_TIMEOUT_MS);
-      for (ClientInfo clientInfo : mClients) {
-        // This is not locking because the field is atomic
-        final long lastUpdate = mClock.millis() - clientInfo.getLastContactMs();
-        if (lastUpdate > masterClientTimeoutMs) {
-          LOG.error("The client {}({}) timed out after {}ms without a heartbeat!",
-              clientInfo.getId(), clientInfo.getClientIdentifier(), lastUpdate);
-          mLostClients.add(clientInfo);
-          mClients.remove(clientInfo);
-        }
-      }
-    }
-
-    @Override
-    public void close() {
-      // Nothing to clean up
-    }
   }
 }
