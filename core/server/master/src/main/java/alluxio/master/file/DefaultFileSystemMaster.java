@@ -3002,7 +3002,7 @@ public class DefaultFileSystemMaster extends CoreMaster
   }
 
   @Override
-  public List<Long> getLostFiles() {
+  public Set<Long> getLostFiles() {
     Set<Long> lostFiles = new HashSet<>();
     Iterator<Long> iter = mBlockMaster.getLostBlocksIterator();
     while (iter.hasNext()) {
@@ -3012,7 +3012,7 @@ public class DefaultFileSystemMaster extends CoreMaster
       long fileId = IdUtils.createFileId(containerId);
       lostFiles.add(fileId);
     }
-    return new ArrayList<>(lostFiles);
+    return lostFiles;
   }
 
   /**
