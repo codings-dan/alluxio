@@ -110,9 +110,7 @@ public class ShimFileSystem extends AbstractFileSystem {
     LOG.debug("Successfully to mAlluxioFileSystem to {}", mFileSystem);
 
     mFallbackEnabled = mAlluxioConf.getBoolean(TxPropertyKey.USER_FALLBACK_ENABLED);
-    if (mFallbackEnabled) {
-      mFallbackManager = new FallbackManager(mAlluxioConf);
-    }
+    mFallbackManager = new FallbackManager(mAlluxioConf);
     if (mAlluxioConf.isSet(TxPropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST)) {
       List<String> prefixes =
           mAlluxioConf.getList(TxPropertyKey.USER_SHIMFS_BYPASS_PREFIX_LIST);
