@@ -21,6 +21,7 @@ import alluxio.metrics.MetricKey;
 import alluxio.metrics.MetricsSystem;
 import alluxio.resource.CloseableResource;
 import alluxio.underfs.UnderFileSystem;
+import alluxio.util.ImpersonateThreadPoolExecutor;
 import alluxio.util.ThreadFactoryUtils;
 import alluxio.util.io.PathUtils;
 
@@ -66,7 +67,7 @@ public final class AsyncUfsAbsentPathCache implements UfsAbsentPathCache {
    */
   private final Cache<String, Pair<Long, Long>> mCache;
   /** A thread pool for the async tasks. */
-  private final ThreadPoolExecutor mPool;
+  private final ImpersonateThreadPoolExecutor mPool;
   /** Number of threads for the async pool. */
   private final int mThreads;
 
@@ -82,9 +83,10 @@ public final class AsyncUfsAbsentPathCache implements UfsAbsentPathCache {
     mCache = CacheBuilder.newBuilder().maximumSize(MAX_PATHS).build();
     mThreads = numThreads;
 
-    mPool = new ThreadPoolExecutor(mThreads, mThreads, THREAD_KEEP_ALIVE_SECONDS,
-        TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(),
-        ThreadFactoryUtils.build("UFS-Absent-Path-Cache-%d", true));
+    mPool = new ImpersonateThreadPoolExecutor(
+        new ThreadPoolExecutor(mThreads, mThreads, THREAD_KEEP_ALIVE_SECONDS,
+            TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(),
+            ThreadFactoryUtils.build("UFS-Absent-Path-Cache-%d", true)));
     mPool.allowCoreThreadTimeOut(true);
     MetricsSystem.registerGaugeIfAbsent(MetricKey.MASTER_ABSENT_CACHE_SIZE.getName(),
         mCache::size);

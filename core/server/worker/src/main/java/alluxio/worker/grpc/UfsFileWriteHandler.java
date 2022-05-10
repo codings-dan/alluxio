@@ -169,8 +169,14 @@ public final class UfsFileWriteHandler extends AbstractWriteHandler<UfsFileWrite
 
     MetricKey counterKey = MetricKey.WORKER_BYTES_WRITTEN_UFS;
     MetricKey meterKey = MetricKey.WORKER_BYTES_WRITTEN_UFS_THROUGHPUT;
-    context.setCounter(MetricsSystem.counterWithTags(counterKey.getName(),
-        counterKey.isClusterAggregated(), MetricInfo.TAG_UFS, ufsString));
+    if (mUserInfo.getAuthorizedUserName() != null) {
+      context.setCounter(MetricsSystem.counterWithTags(counterKey.getName(),
+          counterKey.isClusterAggregated(), MetricInfo.TAG_UFS, ufsString, MetricInfo.TAG_USER,
+          mUserInfo.getAuthorizedUserName()));
+    } else {
+      context.setCounter(MetricsSystem.counterWithTags(counterKey.getName(),
+          counterKey.isClusterAggregated(), MetricInfo.TAG_UFS, ufsString));
+    }
     context.setMeter(MetricsSystem.meterWithTags(meterKey.getName(),
         meterKey.isClusterAggregated(), MetricInfo.TAG_UFS, ufsString));
   }

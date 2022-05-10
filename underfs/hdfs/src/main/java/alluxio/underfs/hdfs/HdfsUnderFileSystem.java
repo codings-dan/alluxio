@@ -108,6 +108,9 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
   private ConcurrentHashMap<String, Boolean> mSetOwnerSkipImpersonationMap =
       new ConcurrentHashMap<>();
 
+  private ConcurrentHashMap<String, Boolean> mSetOwnerFailedMap =
+      new ConcurrentHashMap<>();
+
   /**
    * Factory method to constructs a new HDFS {@link UnderFileSystem} instance.
    *
@@ -715,6 +718,13 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
       impersonatedUser = SecurityUtils.getOwnerFromGrpcClient(
           new InstancedConfiguration(mUfsConf.copyProperties()));
     }
+    // TODO(baoloongmao): Should provide a way to clear mSetOwnerFailedMap.
+    //  Is there a way to remove a user from mSetOwnerFailedMap?
+    //  We should only put user into mSetOwnerFailedMap for AccessControlException.
+    if (impersonatedUser != null
+        && mSetOwnerFailedMap.getOrDefault(impersonatedUser, false)) {
+      return;
+    }
     if (impersonatedUser != null && mSetOwnerSkipImpersonationMap.getOrDefault(
         impersonatedUser, false)) {
       try {
@@ -727,6 +737,7 @@ public class HdfsUnderFileSystem extends ConsistentUnderFileSystem
       } catch (FileNotFoundException e) {
         throw e;
       } catch (IOException e) {
+        mSetOwnerFailedMap.put(impersonatedUser, true);
         mSetOwnerSkipImpersonationMap.remove(impersonatedUser);
         String message = String.format(
             "Failed to set owner (with ugi: %s) for %s to %s:%s error: %s",

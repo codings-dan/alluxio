@@ -25,7 +25,9 @@ import alluxio.metrics.MetricKey;
 import alluxio.metrics.MetricsSystem;
 import alluxio.network.protocol.databuffer.DataBuffer;
 import alluxio.network.protocol.databuffer.NettyDataBuffer;
+import alluxio.proto.dataserver.Protocol;
 import alluxio.resource.LockResource;
+import alluxio.security.authentication.AuthenticatedClientUser;
 import alluxio.security.authentication.AuthenticatedUserInfo;
 import alluxio.util.LogUtils;
 import alluxio.util.logging.SamplingLogger;
@@ -153,6 +155,9 @@ public class BlockReadHandler implements StreamObserver<alluxio.grpc.ReadRequest
       validateReadRequest(request);
       mContext.setPosToQueue(mContext.getRequest().getStart());
       mContext.setPosReceived(mContext.getRequest().getStart());
+      if (AuthenticatedClientUser.getOrNull() == null) {
+        AuthenticatedClientUser.set(mUserInfo.getAuthorizedUserName());
+      }
       mDataReaderExecutor.submit(createDataReader(mContext, mResponseObserver));
       mContext.setDataReaderActive(true);
     } catch (RejectedExecutionException e) {
@@ -276,15 +281,19 @@ public class BlockReadHandler implements StreamObserver<alluxio.grpc.ReadRequest
    */
   protected BlockReadRequestContext createRequestContext(alluxio.grpc.ReadRequest request) {
     BlockReadRequestContext context = new BlockReadRequestContext(request);
+    MetricKey counterKey = MetricKey.WORKER_BYTES_READ_REMOTE;
+    MetricKey meterKey = MetricKey.WORKER_BYTES_READ_REMOTE_THROUGHPUT;
     if (mDomainSocketEnabled) {
-      context.setCounter(MetricsSystem.counter(MetricKey.WORKER_BYTES_READ_DOMAIN.getName()));
-      context.setMeter(MetricsSystem
-          .meter(MetricKey.WORKER_BYTES_READ_DOMAIN_THROUGHPUT.getName()));
-    } else {
-      context.setCounter(MetricsSystem.counter(MetricKey.WORKER_BYTES_READ_REMOTE.getName()));
-      context.setMeter(MetricsSystem
-          .meter(MetricKey.WORKER_BYTES_READ_REMOTE_THROUGHPUT.getName()));
+      counterKey = MetricKey.WORKER_BYTES_READ_DOMAIN;
+      meterKey = MetricKey.WORKER_BYTES_READ_DOMAIN_THROUGHPUT;
     }
+    if (mUserInfo.getAuthorizedUserName() != null) {
+      context.setCounter(MetricsSystem.counterWithTags(counterKey.getName(), counterKey
+          .isClusterAggregated(), "User", mUserInfo.getAuthorizedUserName()));
+    } else {
+      context.setCounter(MetricsSystem.counter(counterKey.getName()));
+    }
+    context.setMeter(MetricsSystem.meter(meterKey.getName()));
     RPC_READ_COUNT.inc();
     return context;
   }
@@ -563,6 +572,13 @@ public class BlockReadHandler implements StreamObserver<alluxio.grpc.ReadRequest
           LOG.warn("Failed to promote block {}: {}", request.getId(), e.toString());
         }
       }
+      Protocol.OpenUfsBlockOptions openUfsBlockOptions = request.getOpenUfsBlockOptions();
+      if (openUfsBlockOptions != null && mUserInfo.getAuthorizedUserName() != null) {
+        openUfsBlockOptions = openUfsBlockOptions.toBuilder()
+            .setUser(mUserInfo.getAuthorizedUserName())
+            .build();
+      }
+      request.setOpenUfsBlockOptions(openUfsBlockOptions);
       BlockReader reader = mWorker.createBlockReader(request);
       context.setBlockReader(reader);
     }

@@ -23,7 +23,7 @@ import javax.annotation.concurrent.ThreadSafe;
  */
 @ThreadSafe
 public final class BlockReadRequest {
-  private final Protocol.OpenUfsBlockOptions mOpenUfsBlockOptions;
+  private Protocol.OpenUfsBlockOptions mOpenUfsBlockOptions;
   private final long mId;
   private final long mStart;
   private final long mEnd;
@@ -113,6 +113,14 @@ public final class BlockReadRequest {
    */
   public boolean isPositionShort() {
     return mPositionShort;
+  }
+
+  /**
+   * Set OpenUfsBlockOptions.
+   * @param options
+   */
+  public void setOpenUfsBlockOptions(Protocol.OpenUfsBlockOptions options) {
+    mOpenUfsBlockOptions = options;
   }
 
   /**

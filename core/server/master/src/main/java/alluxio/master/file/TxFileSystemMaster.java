@@ -41,6 +41,7 @@ import alluxio.security.User;
 import alluxio.security.authentication.AuthenticatedClientUser;
 import alluxio.security.authorization.Mode;
 import alluxio.util.IdUtils;
+import alluxio.util.ImpersonateThreadPoolExecutor;
 import alluxio.util.ThreadFactoryUtils;
 import alluxio.util.executor.ExecutorServiceFactories;
 import alluxio.util.executor.ExecutorServiceFactory;
@@ -69,7 +70,7 @@ import javax.annotation.Nullable;
 public final class TxFileSystemMaster extends DefaultFileSystemMaster {
   private static final Logger LOG = LoggerFactory.getLogger(TxFileSystemMaster.class);
 
-  private ThreadPoolExecutor mListStautsExecutor;
+  private ImpersonateThreadPoolExecutor mListStautsExecutor;
 
   private final Queue<Future<Boolean>> mListInodeJobs;
 
@@ -107,11 +108,12 @@ public final class TxFileSystemMaster extends DefaultFileSystemMaster {
     mListInodeJobs = new LinkedList<>();
 
     if (ServerConfiguration.getBoolean(TxPropertyKey.MASTER_LIST_CONCURRENT_ENABLED)) {
-      mListStautsExecutor = new ThreadPoolExecutor(
-          ServerConfiguration.getInt(TxPropertyKey.MASTER_LIST_STATUS_EXECUTOR_POOL_SIZE),
-          ServerConfiguration.getInt(TxPropertyKey.MASTER_LIST_STATUS_EXECUTOR_POOL_SIZE),
-          1, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
-          ThreadFactoryUtils.build("alluxio-list-status-%d", false));
+      mListStautsExecutor = new ImpersonateThreadPoolExecutor(
+          new ThreadPoolExecutor(
+              ServerConfiguration.getInt(TxPropertyKey.MASTER_LIST_STATUS_EXECUTOR_POOL_SIZE),
+              ServerConfiguration.getInt(TxPropertyKey.MASTER_LIST_STATUS_EXECUTOR_POOL_SIZE),
+              1, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
+              ThreadFactoryUtils.build("alluxio-list-status-%d", false)));
       mListStautsExecutor.allowCoreThreadTimeOut(true);
     }
     MetricsSystem.registerGaugeIfAbsent(TxMetricKey.CLUSTER_REGISTER_CLIENTS.getName(),

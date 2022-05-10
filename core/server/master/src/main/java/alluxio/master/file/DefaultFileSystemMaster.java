@@ -158,6 +158,7 @@ import alluxio.underfs.UnderFileSystemConfiguration;
 import alluxio.underfs.options.MkdirsOptions;
 import alluxio.util.CommonUtils;
 import alluxio.util.IdUtils;
+import alluxio.util.ImpersonateThreadPoolExecutor;
 import alluxio.util.LogUtils;
 import alluxio.util.ModeUtils;
 import alluxio.util.SecurityUtils;
@@ -412,23 +413,29 @@ public class DefaultFileSystemMaster extends CoreMaster
 
   private long mSlowListOperationThreshold;
 
-  final ThreadPoolExecutor mSyncPrefetchExecutor = new ThreadPoolExecutor(
-      ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_UFS_PREFETCH_POOL_SIZE),
-      ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_UFS_PREFETCH_POOL_SIZE),
-      1, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
-      ThreadFactoryUtils.build("alluxio-ufs-sync-prefetch-%d", false));
+  final ImpersonateThreadPoolExecutor mSyncPrefetchExecutor =
+      new ImpersonateThreadPoolExecutor(
+          new ThreadPoolExecutor(
+              ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_UFS_PREFETCH_POOL_SIZE),
+              ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_UFS_PREFETCH_POOL_SIZE),
+              1, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
+              ThreadFactoryUtils.build("alluxio-ufs-sync-prefetch-%d", false)));
 
-  final ThreadPoolExecutor mSyncMetadataExecutor = new ThreadPoolExecutor(
-      ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_EXECUTOR_POOL_SIZE),
-      ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_EXECUTOR_POOL_SIZE),
-      1, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
-      ThreadFactoryUtils.build("alluxio-ufs-sync-%d", false));
+  final ImpersonateThreadPoolExecutor mSyncMetadataExecutor =
+      new ImpersonateThreadPoolExecutor(
+          new ThreadPoolExecutor(
+              ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_EXECUTOR_POOL_SIZE),
+              ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_EXECUTOR_POOL_SIZE),
+              1, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
+              ThreadFactoryUtils.build("alluxio-ufs-sync-%d", false)));
 
-  final ThreadPoolExecutor mActiveSyncMetadataExecutor = new ThreadPoolExecutor(
-      ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_EXECUTOR_POOL_SIZE),
-      ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_EXECUTOR_POOL_SIZE),
-      1, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
-      ThreadFactoryUtils.build("alluxio-ufs-active-sync-%d", false));
+  final ImpersonateThreadPoolExecutor mActiveSyncMetadataExecutor =
+      new ImpersonateThreadPoolExecutor(
+          new ThreadPoolExecutor(
+              ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_EXECUTOR_POOL_SIZE),
+              ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_EXECUTOR_POOL_SIZE),
+              1, TimeUnit.MINUTES, new LinkedBlockingQueue<>(),
+              ThreadFactoryUtils.build("alluxio-ufs-active-sync-%d", false)));
   private HeartbeatThread mReplicationCheckHeartbeatThread;
 
   /**
