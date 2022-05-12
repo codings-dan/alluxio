@@ -41,9 +41,9 @@ public abstract class AbstractMasterClient extends AbstractClient {
     super(clientConf, null,
         clientConf.getClusterConf().getBoolean(TxPropertyKey.USER_FALLBACK_ENABLED)
             ? () -> new ExponentialBackoffRetry(
-                clientConf.getClusterConf()
-                    .getInt(TxPropertyKey.USER_FALLBACK_RETRY_BASE_SLEEP_MS),
-                clientConf.getClusterConf().getInt(TxPropertyKey.USER_FALLBACK_RETRY_MAX_SLEEP_MS),
+          (int) clientConf.getClusterConf()
+                    .getMs(TxPropertyKey.USER_FALLBACK_RETRY_BASE_SLEEP_MS),
+          (int) clientConf.getClusterConf().getMs(TxPropertyKey.USER_FALLBACK_RETRY_MAX_SLEEP_MS),
                 clientConf.getClusterConf().getInt(TxPropertyKey.USER_FALLBACK_RETRY_MAX_TIMES))
             : () -> RetryUtils.defaultClientRetry(
                 clientConf.getClusterConf().getDuration(PropertyKey.USER_RPC_RETRY_MAX_DURATION),
