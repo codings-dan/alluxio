@@ -95,8 +95,8 @@ public class FallbackManager {
             .getConnectAddress(NetworkAddressUtils.ServiceType.MASTER_RPC, mConf);
         UserState mUserState = Factory.create(mConf);
         RetryPolicy retry = new ExponentialBackoffRetry(
-            mConf.getInt(TxPropertyKey.USER_FALLBACK_RETRY_BASE_SLEEP_MS),
-            mConf.getInt(TxPropertyKey.USER_FALLBACK_RETRY_MAX_SLEEP_MS),
+            (int) mConf.getMs(TxPropertyKey.USER_FALLBACK_RETRY_BASE_SLEEP_MS),
+            (int) mConf.getMs(TxPropertyKey.USER_FALLBACK_RETRY_MAX_SLEEP_MS),
             mConf.getInt(TxPropertyKey.USER_FALLBACK_RETRY_MAX_TIMES));
         while (retry.attempt()) {
           try {
