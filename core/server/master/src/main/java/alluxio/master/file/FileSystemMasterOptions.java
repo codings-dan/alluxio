@@ -22,14 +22,14 @@ import javax.annotation.concurrent.ThreadSafe;
  */
 @ThreadSafe
 public final class FileSystemMasterOptions {
-  private static final  CompleteFilePOptions DEFAULT = CompleteFilePOptions.newBuilder()
-      .setCommonOptions(FileSystemOptions.commonDefaults(ServerConfiguration.global()))
-      .setUfsLength(0).build();
 
   /**
    * @return Master side defaults for {@link CompleteFilePOptions}
    */
   public static CompleteFilePOptions completeFileDefaults() {
-    return DEFAULT;
+    return CompleteFilePOptions.newBuilder()
+        .setCommonOptions(FileSystemOptions.commonDefaults(ServerConfiguration.global()))
+        .setUfsLength(0)
+        .build();
   }
 }

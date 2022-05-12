@@ -16,7 +16,6 @@ import alluxio.client.WriteType;
 import alluxio.collections.Pair;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
-import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AccessControlException;
 import alluxio.exception.BlockInfoException;
 import alluxio.exception.DirectoryNotEmptyException;
@@ -190,7 +189,7 @@ public class InodeSyncStream {
   private final ConcurrentLinkedQueue<AlluxioURI> mPendingPaths;
 
   /** Queue of paths that have been submitted to the executor. */
-  private final Queue<Future<SyncResult>> mSyncPathJobs;
+  private final Queue<Future<Boolean>> mSyncPathJobs;
 
   /** The executor enabling concurrent processing. */
   private final ExecutorService mMetadataSyncService;
@@ -198,8 +197,6 @@ public class InodeSyncStream {
   /** The maximum number of concurrent paths that can be syncing at any moment. */
   private final int mConcurrencyLevel =
       ServerConfiguration.getInt(PropertyKey.MASTER_METADATA_SYNC_CONCURRENCY_LEVEL);
-  private final int mParallelLevel =
-      ServerConfiguration.getInt(TxPropertyKey.MASTER_METADATA_SYNC_PARALLEL_LEVEL);
 
   private final FileSystemMasterAuditContext mAuditContext;
   private final Function<LockedInodePath, Inode> mAuditContextSrcInodeFunc;
@@ -366,7 +363,7 @@ public class InodeSyncStream {
       // First, remove any futures which have completed. Add to the sync path count if they sync'd
       // successfully
       while (true) {
-        Future<SyncResult> job = mSyncPathJobs.peek();
+        Future<Boolean> job = mSyncPathJobs.peek();
         if (job == null || !job.isDone()) {
           break;
         }
@@ -380,11 +377,13 @@ public class InodeSyncStream {
         try {
           // we synced the path successfully
           // This shouldn't block because we checked job.isDone() earlier
-          SyncResult result = job.get();
-          syncPathCount += result.getSuccessCount();
-          failedSyncPathCount += result.getFailCount();
+          if (job.get()) {
+            syncPathCount++;
+          } else {
+            failedSyncPathCount++;
+          }
         } catch (InterruptedException | ExecutionException e) {
-          failedSyncPathCount += mParallelLevel;
+          failedSyncPathCount++;
           LogUtils.warnWithException(
               LOG, "metadata sync failed while polling for finished paths; {}",
               toString(), e);
@@ -403,26 +402,19 @@ public class InodeSyncStream {
       // We can submit up to ( max_concurrency - <jobs queue size>) jobs back into the queue
       int submissions = mConcurrencyLevel - mSyncPathJobs.size();
       for (int i = 0; i < submissions; i++) {
-        Queue<AlluxioURI> paths = new LinkedList<>();
-        while (!mPendingPaths.isEmpty()) {
-          if (paths.size() >= mParallelLevel) {
-            break;
-          }
-          AlluxioURI path = mPendingPaths.poll();
-          if (path == null) {
-            // no paths left to sync
-            break;
-          }
-          paths.offer(path);
+        AlluxioURI path = mPendingPaths.poll();
+        if (path == null) {
+          // no paths left to sync
+          break;
         }
-        Future<SyncResult> job = mMetadataSyncService.submit(() -> processSyncPaths(paths));
+        Future<Boolean> job = mMetadataSyncService.submit(() -> processSyncPath(path));
         mSyncPathJobs.offer(job);
         // Update global counters for all sync streams
         DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_PENDING_PATHS_TOTAL.dec();
         DefaultFileSystemMaster.Metrics.INODE_SYNC_STREAM_ACTIVE_PATHS_TOTAL.inc();
       }
       // After submitting all jobs wait for the job at the head of the queue to finish.
-      Future<SyncResult> oldestJob = mSyncPathJobs.peek();
+      Future<Boolean> oldestJob = mSyncPathJobs.peek();
       if (oldestJob == null) { // There might not be any jobs, restart the loop.
         continue;
       }
@@ -456,42 +448,6 @@ public class InodeSyncStream {
     // Update metrics at the end of operation
     updateMetrics(success, startTime, syncPathCount, failedSyncPathCount);
     return success ? SyncStatus.OK : SyncStatus.FAILED;
-  }
-
-  private SyncResult processSyncPaths(Queue<AlluxioURI> paths) {
-    int success = 0;
-    int fail = 0;
-    while (!paths.isEmpty()) {
-      AlluxioURI path = paths.poll();
-      if (path == null) {
-        fail++;
-        continue;
-      }
-      if (processSyncPath(path)) {
-        success++;
-      } else {
-        fail++;
-      }
-    }
-    return new SyncResult(success, fail);
-  }
-
-  private class SyncResult {
-    private final int mSuccessCount;
-    private final int mFailCount;
-
-    SyncResult(int successCount, int failCount) {
-      mFailCount = failCount;
-      mSuccessCount = successCount;
-    }
-
-    public int getSuccessCount() {
-      return mSuccessCount;
-    }
-
-    public int getFailCount() {
-      return mFailCount;
-    }
   }
 
   private void updateMetrics(boolean success, Instant startTime,
