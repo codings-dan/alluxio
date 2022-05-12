@@ -440,6 +440,11 @@ public final class Load2Command extends AbstractFileSystemCommand {
             mWorkerNetAddress.getHost());
         e.printStackTrace();
       } finally {
+        if (successfully) {
+          mWorksCompletedTasksInfoMap.get(mWorkerNetAddress).add(pool.size(), taskLength[0]);
+        } else {
+          mWorksFailedTasksInfoMap.get(mWorkerNetAddress).add(pool.size(), 0);
+        }
         if (!mQuiet) {
           System.out.print(mWorkerNetAddress.getHost()
               + "  loaded successfully: "
@@ -451,11 +456,7 @@ public final class Load2Command extends AbstractFileSystemCommand {
               + getSizeFromBytes(mWorksFailedTasksInfoMap.get(mWorkerNetAddress).getLength()));
           System.out.println();
         }
-        if (successfully) {
-          mWorksCompletedTasksInfoMap.get(mWorkerNetAddress).add(pool.size(), taskLength[0]);
-        } else {
-          mWorksFailedTasksInfoMap.get(mWorkerNetAddress).add(pool.size(), 0);
-        }
+
         mActives.addAndGet(-pool.size());
         pool.clear();
       }
