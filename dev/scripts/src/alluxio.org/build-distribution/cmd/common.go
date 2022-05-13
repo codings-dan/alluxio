@@ -91,7 +91,8 @@ var libJars = map[string]struct{}{
 
 // authModules is a map from authorization module to information for building the module.
 var authModules = map[string]module{
-	"auth-ranger-hdfs": {"ranger", "hdfs", true, "-pl integration/authorization/hdfs -Dauth.hadoop.version=2.8.5 -Dauth.plugin.name=ranger"},
+	"auth-ranger-hdfs": {"ranger-hdfs", "hdfs", true, "-pl integration/authorization/hdfs -Pauth-ranger -Dauth.hadoop.version=2.8.5 -Dauth.plugin.name=ranger"},
+	"auth-ranger-tbds": {"ranger-tbds", "hdfs", true, "-pl integration/authorization/hdfs -Pauth-ranger-tbds -Dauth.hadoop.version=2.8.5 -Dauth.plugin.name=ranger"},
 }
 
 func validModules(modules map[string]module) []string {
