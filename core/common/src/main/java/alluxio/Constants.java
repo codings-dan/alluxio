@@ -227,5 +227,8 @@ public final class Constants {
   public static final String MEDIUM_HDD = "HDD";
   public static final String MEDIUM_SSD = "SSD";
 
+  //tbds authentication
+  public static final String PLAIN_TBDS_AUTHCINFO_SEP = " ";
+
   private Constants() {} // prevent instantiation
 }

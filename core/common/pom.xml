@@ -27,6 +27,7 @@
     <!-- run properly from sub-project directories -->
     <build.path>${project.parent.parent.basedir}/build</build.path>
     <failIfNoTests>false</failIfNoTests>
+    <skip.tbds>**/authentication/plain/tbds/**</skip.tbds>
   </properties>
 
   <dependencies>
@@ -146,6 +147,14 @@
       </resource>
     </resources>
     <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>${skip.tbds}</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
       <!-- Export test classes in a test-jar so that other projects can use them for testing -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -211,4 +220,43 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>tbds</id>
+      <dependencies>
+        <dependency>
+          <groupId>com.tencent.tbds</groupId>
+          <artifactId>tbds-rpc</artifactId>
+          <version>5.1.3.0</version>
+          <exclusions>
+            <exclusion>
+              <groupId>org.apache.commons</groupId>
+              <artifactId>commons-lang3</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>com.tencent.tbds.sdk</groupId>
+          <artifactId>tbds-sdk-plugin</artifactId>
+          <version>5.1.3.0</version>
+          <exclusions>
+            <exclusion>
+              <groupId>org.apache.thrift</groupId>
+              <artifactId>libthrift</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.slf4j</groupId>
+              <artifactId>jcl-over-slf4j</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+      </dependencies>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <skip.tbds>Dummy</skip.tbds>
+      </properties>
+    </profile>
+  </profiles>
 </project>

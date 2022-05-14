@@ -363,6 +363,49 @@ public final class TxPropertyKey {
           .setDefaultValue("gidNumber")
           .build();
 
+  public static final PropertyKey SECURITY_AUTHENTICATION_TBDS_SECURE_ID =
+      Builder.stringBuilder(Name.SECURITY_AUTHENTICATION_TBDS_SECURE_ID)
+          .setDescription("The id to provide tbds authentication secureId.")
+          .setAlias(Name.HADOOP_SECURITY_AUTH_TBDS_SECUREID,
+            Name.HADOOP_SECURITY_AUTH_TBDS_SECUREID_ALIAS)
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.NONE)
+          .build();
+  public static final PropertyKey SECURITY_AUTHENTICATION_TBDS_SECURE_KEY =
+      Builder.stringBuilder(Name.SECURITY_AUTHENTICATION_TBDS_SECURE_KEY)
+          .setDescription("The id to provide tbds authentication secureKey.")
+          .setAlias(Name.HADOOP_SECURITY_AUTH_TBDS_SECUREKEY,
+            Name.HADOOP_SECURITY_AUTH_TBDS_SECUREKEY_ALIAS)
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.NONE)
+          .build();
+  public static final PropertyKey SECURITY_AUTHENTICATION_TBDS_SECURE_USER_NAME =
+      Builder.stringBuilder(Name.SECURITY_AUTHENTICATION_TBDS_SECURE_USER_NAME)
+          .setDescription("The id to provide tbds authentication secure userName.")
+          .setAlias(Name.HADOOP_SECURITY_AUTH_TBDS_USERNAME,
+            Name.HADOOP_SECURITY_AUTH_TBDS_USERNAME_ALIAS)
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.NONE)
+          .build();
+  public static final PropertyKey SECURITY_AUTHENTICATION_TBDS_PORTAL_RPC_IP =
+      Builder.stringBuilder(Name.SECURITY_AUTHENTICATION_TBDS_PORTAL_RPC_IP)
+          .setDescription("The tbds server ip.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.NONE)
+          .build();
+  public static final PropertyKey SECURITY_AUTHENTICATION_TBDS_PORTAL_RPC_PORT =
+      Builder.intBuilder(Name.SECURITY_AUTHENTICATION_TBDS_PORTAL_RPC_PORT)
+          .setDescription("The tbds server port.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.NONE)
+          .build();
+  public static final PropertyKey SECURITY_AUTHENTICATION_TBDS_TABLE =
+      Builder.stringBuilder(Name.SECURITY_AUTHENTICATION_TBDS_TABLE)
+          .setDescription("The tbds authentication table.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+          .setScope(Scope.NONE)
+          .build();
+
   public static final PropertyKey SECURITY_UNDERFS_HDFS_IMPERSONATION_ENABLED =
       Builder.booleanBuilder(Name.SECURITY_UNDERFS_HDFS_IMPERSONATION_ENABLED)
           .setDefaultValue(true)
@@ -536,8 +579,7 @@ public final class TxPropertyKey {
         "alluxio.security.authorization.plugin.paths";
     public static final String SECURITY_AUTHORIZATION_PLUGINS_ENABLED =
         "alluxio.security.authorization.plugins.enabled";
-    public static final String SECURITY_AUTHENTICATION_TYPE =
-        "alluxio.security.authentication.type";
+
     public static final String SECURITY_AUTHORIZATION_PERMISSION_ENABLED =
         "alluxio.security.authorization.permission.enabled";
     public static final String SECURITY_AUTHORIZATION_PERMISSION_SUPERGROUP =
@@ -547,11 +589,36 @@ public final class TxPropertyKey {
     public static final String SECURITY_GROUP_MAPPING_CLASS =
         "alluxio.security.group.mapping.class";
     public static final String SECURITY_LOGIN_USERNAME = "alluxio.security.login.username";
-
     public static final String SECURITY_AUTHENTICATION_CUSTOM_SASL_CLIENT_CLASS =
             "alluxio.security.authentication.custom.sasl.client.class";
     public static final String SECURITY_AUTHENTICATION_CUSTOM_SASL_SERVER_CLASS =
             "alluxio.security.authentication.custom.sasl.server.class";
+    // TBDS Auth related properties
+    public static final String SECURITY_AUTHENTICATION_TBDS_SECURE_ID =
+        "alluxio.security.authorization.tbds.secureid";
+    public static final String SECURITY_AUTHENTICATION_TBDS_SECURE_KEY =
+        "alluxio.security.authorization.tbds.securekey";
+    public static final String SECURITY_AUTHENTICATION_TBDS_SECURE_USER_NAME =
+        "alluxio.security.authorization.tbds.username";
+    public static final String SECURITY_AUTHENTICATION_TBDS_PORTAL_RPC_IP =
+        "alluxio.security.authorization.tbds.portal.rpc.ip";
+    public static final String SECURITY_AUTHENTICATION_TBDS_PORTAL_RPC_PORT =
+        "alluxio.security.authorization.tbds.portal.rpc.port";
+    public static final String SECURITY_AUTHENTICATION_TBDS_TABLE =
+        "alluxio.security.authorization.tbds.table";
+    //tbds authentication
+    public static final String HADOOP_SECURITY_AUTH_TBDS_USERNAME =
+        "hadoop_security_authentication_tbds_username";
+    public static final String HADOOP_SECURITY_AUTH_TBDS_SECUREID =
+        "hadoop_security_authentication_tbds_secureid";
+    public static final String HADOOP_SECURITY_AUTH_TBDS_SECUREKEY =
+        "hadoop_security_authentication_tbds_securekey";
+    public static final String HADOOP_SECURITY_AUTH_TBDS_USERNAME_ALIAS =
+        "hadoop.security.authentication.tbds.username";
+    public static final String HADOOP_SECURITY_AUTH_TBDS_SECUREID_ALIAS =
+        "hadoop.security.authentication.tbds.secureid";
+    public static final String HADOOP_SECURITY_AUTH_TBDS_SECUREKEY_ALIAS =
+        "hadoop.security.authentication.tbds.securekey";
 
     // ldap group mapping related properties
     public static final String SECURITY_GROUP_MAPPING_LDAP_URL =
