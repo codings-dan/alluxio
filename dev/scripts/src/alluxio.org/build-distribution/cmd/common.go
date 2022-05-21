@@ -93,6 +93,7 @@ var libJars = map[string]struct{}{
 var authModules = map[string]module{
 	"auth-ranger-hdfs": {"ranger-hdfs", "hdfs", true, "-pl integration/authorization/hdfs -Pauth-ranger -Dauth.hadoop.version=2.8.5 -Dauth.plugin.name=ranger"},
 	"auth-ranger-tbds": {"ranger-tbds", "hdfs", true, "-pl integration/authorization/hdfs -Pauth-ranger-tbds -Dauth.hadoop.version=2.8.5 -Dauth.plugin.name=ranger"},
+	"auth-ranger-cosranger": {"ranger-cosranger", "cosranger", true, "-pl integration/authorization/cosranger -Pauth-ranger -Dauth.hadoop.version=2.8.5 -Dauth.plugin.name=ranger"},
 }
 
 func validModules(modules map[string]module) []string {

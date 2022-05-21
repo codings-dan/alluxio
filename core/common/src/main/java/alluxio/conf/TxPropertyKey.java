@@ -478,6 +478,44 @@ public final class TxPropertyKey {
           .setScope(Scope.CLIENT)
           .build();
 
+  //
+  // cos-ranger related properties
+  //
+  public static final PropertyKey ALLUXIO_COS_QCLOUD_OBJECT_STORAGE_PERMISSION_CHECK_MAX_RETRY_KEY =
+      Builder.intBuilder(Name.ALLUXIO_COS_QCLOUD_OBJECT_STORAGE_PERMISSION_CHECK_MAX_RETRY_KEY)
+          .setDescription("coranger check permission cnt for alluxio")
+          .setDefaultValue(2)
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey ALLUXIO_COS_QCLOUD_OBJECT_STORAGE_CONFIG_DIR_KEY =
+      Builder.stringBuilder(Name.ALLUXIO_COS_QCLOUD_OBJECT_STORAGE_CONFIG_DIR_KEY)
+          .setDescription("Classpaths for the under filesystem(cos) authorization plugin,"
+              + "separated by colons.")
+          .setDefaultValue("")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
+
+  public static final PropertyKey UNDERFS_COS_PREFIXES =
+      Builder.listBuilder(Name.UNDERFS_COS_PREFIXES)
+          .setDefaultValue("cosn://")
+          .setDescription("Optionally, specify which prefixes should run through the COS "
+              + "implementation of UnderFileSystem. The delimiter is any whitespace "
+              + "and/or ','.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.SERVER)
+          .build();
+  public static final PropertyKey UNDERFS_CHDFS_PREFIXES =
+      Builder.listBuilder(Name.UNDERFS_CHDFS_PREFIXES)
+          .setDefaultValue("ofs://")
+          .setDescription("Optionally, specify which prefixes should run through the CHDFS "
+              + "implementation of UnderFileSystem. The delimiter is any whitespace "
+              + "and/or ','.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.SERVER)
+          .build();
+
   /**
    * A nested class to hold named string constants for their corresponding properties.
    * Used for setting configuration in integration tests.
@@ -619,6 +657,16 @@ public final class TxPropertyKey {
         "hadoop.security.authentication.tbds.secureid";
     public static final String HADOOP_SECURITY_AUTH_TBDS_SECUREKEY_ALIAS =
         "hadoop.security.authentication.tbds.securekey";
+
+    //
+    // cos-ranger Security related properties
+    //
+    public static final String ALLUXIO_COS_QCLOUD_OBJECT_STORAGE_PERMISSION_CHECK_MAX_RETRY_KEY =
+        "alluxio.cos.qcloud.object.storage.permission.check.max.retry";
+    public static final String ALLUXIO_COS_QCLOUD_OBJECT_STORAGE_CONFIG_DIR_KEY =
+        "alluxio.cos.qcloud.object.storage.ranger.service.config.dir";
+    public static final String UNDERFS_COS_PREFIXES = "alluxio.underfs.cos.prefixes";
+    public static final String UNDERFS_CHDFS_PREFIXES = "alluxio.underfs.chdfs.prefixes";
 
     // ldap group mapping related properties
     public static final String SECURITY_GROUP_MAPPING_LDAP_URL =
