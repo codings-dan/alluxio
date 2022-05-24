@@ -218,6 +218,7 @@ public class RaftJournalSystem extends AbstractJournalSystem {
    * mode.
    */
   private final AtomicReference<AsyncJournalWriter> mAsyncJournalWriter;
+  private final AtomicBoolean mIsReset;
   /**
    * The id for submitting a normal raft client request.
    **/
@@ -246,6 +247,7 @@ public class RaftJournalSystem extends AbstractJournalSystem {
     mPrimarySelector = new RaftPrimarySelector();
     mAsyncJournalWriter = new AtomicReference<>();
     mErrorMessages = new ConcurrentHashMap<>();
+    mIsReset = new AtomicBoolean(true);
   }
 
   private void maybeMigrateOldJournal() {
@@ -261,6 +263,14 @@ public class RaftJournalSystem extends AbstractJournalSystem {
         LOG.warn("Failed to move journal from {} to {}", oldJournalPath, newJournalPath);
       }
     }
+  }
+
+  /**
+   * whether reset state
+   * @return whether reset state
+   */
+  public boolean isReset() {
+    return mIsReset.get();
   }
 
   /**
@@ -536,6 +546,8 @@ public class RaftJournalSystem extends AbstractJournalSystem {
       // Close async writer first to flush pending entries.
       mAsyncJournalWriter.get().close();
       mRaftJournalWriter.close();
+      mIsReset.set(!mAsyncJournalWriter.get().isQueueEmpty()
+          && !mRaftJournalWriter.isHaveJournalUnCommit());
     } catch (IOException e) {
       LOG.warn("Error closing journal writer: {}", e.toString());
     } finally {

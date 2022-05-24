@@ -384,7 +384,7 @@ public class AlluxioMasterProcess extends MasterProcess {
       }
     }
     if (mRPCExecutor != null) {
-      mRPCExecutor.shutdownNow();
+      mRPCExecutor.shutdown();
       try {
         mRPCExecutor.awaitTermination(
             ServerConfiguration.getMs(PropertyKey.NETWORK_CONNECTION_SERVER_SHUTDOWN_TIMEOUT),

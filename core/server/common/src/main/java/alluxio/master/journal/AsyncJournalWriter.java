@@ -252,6 +252,14 @@ public final class AsyncJournalWriter {
     stop();
   }
 
+  /**
+   * Is there any journal entry remaining
+   * @return whether the queue empty
+   */
+  public boolean isQueueEmpty() {
+    return mQueue.isEmpty();
+  }
+
   @VisibleForTesting
   protected void stop() {
     // Set termination flag.

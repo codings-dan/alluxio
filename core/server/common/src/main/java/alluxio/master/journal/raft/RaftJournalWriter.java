@@ -157,6 +157,15 @@ public class RaftJournalWriter implements JournalWriter {
   }
 
   /**
+   * Is there journal entries that have been generated but not yet committed
+   * @return whether any journal entry not commit
+   */
+  public boolean isHaveJournalUnCommit() {
+    return mLastCommittedSequenceNumber.get() == mLastSubmittedSequenceNumber.get()  &&
+        mLastCommittedSequenceNumber.get() == (mNextSequenceNumberToWrite.get() - 1);
+  }
+
+  /**
    * @return the next sequence number that will be written by this writer
    */
   public long getNextSequenceNumberToWrite() {
