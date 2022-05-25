@@ -253,7 +253,7 @@ public final class AsyncJournalWriter {
   }
 
   /**
-   * Is there any journal entry remaining
+   * Is there any journal entry remaining.
    * @return whether the queue empty
    */
   public boolean isQueueEmpty() {

@@ -266,7 +266,7 @@ public class RaftJournalSystem extends AbstractJournalSystem {
   }
 
   /**
-   * whether reset state
+   * whether reset state.
    * @return whether reset state
    */
   public boolean isReset() {
