@@ -782,7 +782,7 @@ public class InodeSyncStream {
                   + "status is present in the context. %s", inodePath.getUri()));
         }
 
-        mInodeTree.setDirectChildrenLoaded(mRpcContext, inode.asDirectory());
+        mInodeTree.setDirectChildrenLoaded(mRpcContext, inode.asDirectory(), true);
         return;
       }
 
@@ -836,7 +836,8 @@ public class InodeSyncStream {
               failedSync++;
             }
           }
-          mInodeTree.setDirectChildrenLoaded(mRpcContext, inodePath.getInode().asDirectory());
+          mInodeTree.setDirectChildrenLoaded(
+              mRpcContext, inodePath.getInode().asDirectory(), true);
         }
       }
     } catch (IOException | InterruptedException e) {
