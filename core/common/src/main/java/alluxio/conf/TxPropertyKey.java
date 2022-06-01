@@ -125,6 +125,12 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
+  public static final PropertyKey WEB_UI_USE_CLIENT_FS_ENABLED =
+      Builder.booleanBuilder(Name.WEB_UI_USE_CLIENT_FS_ENABLED)
+          .setDescription("Whether to use client file system in web server.")
+          .setDefaultValue(true)
+          .setScope(Scope.MASTER)
+          .build();
 
   //
   // Shimfs  related properties
@@ -546,6 +552,8 @@ public final class TxPropertyKey {
         "alluxio.master.journal.async.notify";
     public static final String MASTER_METASTORE_BLOCK_STORE_DIR =
         "alluxio.master.metastore.block.store.dir";
+    public static final String WEB_UI_USE_CLIENT_FS_ENABLED =
+        "alluxio.web.ui.client.fs.enabled";
     //
     // Worker related properties
     //
