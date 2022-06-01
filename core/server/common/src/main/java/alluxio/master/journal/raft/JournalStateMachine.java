@@ -155,6 +155,7 @@ public class JournalStateMachine extends BaseStateMachine {
     if (!journalSystem.canKeepState()) {
       resetState();
     }
+    journalSystem.resetCanKeepState();
     LOG.info("Initialized new journal state machine");
     mJournalSystem = journalSystem;
     mSnapshotManager = new SnapshotReplicationManager(journalSystem, mStorage);

@@ -275,6 +275,13 @@ public class RaftJournalSystem extends AbstractJournalSystem {
     return mCanKeepState.get();
   }
 
+  /**
+   * Reset the mCanKeepState to initial value.
+   */
+  public void resetCanKeepState() {
+    mCanKeepState.set(false);
+  }
+
   public void setHaveTaskUnFinish(boolean haveTaskUnFinish) {
     mHaveTaskUnFinish.set(haveTaskUnFinish);
   }
