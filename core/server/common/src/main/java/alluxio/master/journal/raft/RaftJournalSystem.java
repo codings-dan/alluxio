@@ -218,7 +218,8 @@ public class RaftJournalSystem extends AbstractJournalSystem {
    * mode.
    */
   private final AtomicReference<AsyncJournalWriter> mAsyncJournalWriter;
-  private final AtomicBoolean mIsReset;
+  private final AtomicBoolean mCanKeepState;
+  private final AtomicBoolean mHaveTaskUnFinish;
   /**
    * The id for submitting a normal raft client request.
    **/
@@ -247,7 +248,8 @@ public class RaftJournalSystem extends AbstractJournalSystem {
     mPrimarySelector = new RaftPrimarySelector();
     mAsyncJournalWriter = new AtomicReference<>();
     mErrorMessages = new ConcurrentHashMap<>();
-    mIsReset = new AtomicBoolean(true);
+    mCanKeepState = new AtomicBoolean(false);
+    mHaveTaskUnFinish = new AtomicBoolean(false);
   }
 
   private void maybeMigrateOldJournal() {
@@ -266,11 +268,15 @@ public class RaftJournalSystem extends AbstractJournalSystem {
   }
 
   /**
-   * whether reset state.
+   * whether keep state.
    * @return whether reset state
    */
-  public boolean isReset() {
-    return mIsReset.get();
+  public boolean canKeepState() {
+    return mCanKeepState.get();
+  }
+
+  public void setHaveTaskUnFinish(boolean haveTaskUnFinish) {
+    mHaveTaskUnFinish.set(haveTaskUnFinish);
   }
 
   /**
@@ -546,8 +552,8 @@ public class RaftJournalSystem extends AbstractJournalSystem {
       // Close async writer first to flush pending entries.
       mAsyncJournalWriter.get().close();
       mRaftJournalWriter.close();
-      mIsReset.set(!mAsyncJournalWriter.get().isQueueEmpty()
-          && !mRaftJournalWriter.isHaveJournalUnCommit());
+      mCanKeepState.set(mAsyncJournalWriter.get().isQueueEmpty()
+          && !mRaftJournalWriter.haveJournalUnCommitted() && !mHaveTaskUnFinish.get());
     } catch (IOException e) {
       LOG.warn("Error closing journal writer: {}", e.toString());
     } finally {

@@ -386,9 +386,14 @@ public class AlluxioMasterProcess extends MasterProcess {
     if (mRPCExecutor != null) {
       mRPCExecutor.shutdown();
       try {
-        mRPCExecutor.awaitTermination(
+        if (!mRPCExecutor.awaitTermination(
             ServerConfiguration.getMs(PropertyKey.NETWORK_CONNECTION_SERVER_SHUTDOWN_TIMEOUT),
-            TimeUnit.MILLISECONDS);
+            TimeUnit.MILLISECONDS)) {
+          mRPCExecutor.shutdownNow();
+          if (mJournalSystem instanceof RaftJournalSystem) {
+           ((RaftJournalSystem) mJournalSystem).setHaveTaskUnFinish(true);
+          }
+        }
       } catch (InterruptedException ie) {
         Thread.currentThread().interrupt();
       }

@@ -152,7 +152,7 @@ public class JournalStateMachine extends BaseStateMachine {
     mJournals = journals;
     mJournalApplier = new BufferedJournalApplier(journals,
         () -> journalSystem.getJournalSinks(null));
-    if (journalSystem.isReset()) {
+    if (!journalSystem.canKeepState()) {
       resetState();
     }
     LOG.info("Initialized new journal state machine");
