@@ -435,6 +435,10 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
+  public static final PropertyKey SECURITY_TAUTH_IMPERSONATION_CHECK_ENABLE =
+      Builder.booleanBuilder(Name.SECURITY_TAUTH_IMPERSONATION_CHECK_ENABLE)
+          .setDefaultValue(false)
+          .build();
 
   //
   // Worker related properties
@@ -739,6 +743,8 @@ public final class TxPropertyKey {
         "alluxio.underfs.security.authorization.plugin.name";
     public static final String UNDERFS_SECURITY_AUTHORIZATION_PLUGIN_PATHS =
         "alluxio.underfs.security.authorization.plugin.paths";
+    public static final String SECURITY_TAUTH_IMPERSONATION_CHECK_ENABLE =
+        "alluxio.tauth.impersonation.check.enable";
 
     private Name() {} // prevent instantiation
   }

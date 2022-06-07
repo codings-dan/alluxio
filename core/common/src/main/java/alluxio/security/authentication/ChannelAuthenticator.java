@@ -30,6 +30,7 @@ import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import javax.security.auth.Subject;
 
@@ -177,8 +178,8 @@ public class ChannelAuthenticator {
             TxPropertyKey.SECURITY_AUTHENTICATION_CUSTOM_SASL_CLIENT_CLASS);
         try {
           return (SaslClientHandler) clazz.getConstructor(
-                  new Class[] {Subject.class, AlluxioConfiguration.class})
-              .newInstance(mParentSubject, mConfiguration);
+                new Class[] {Subject.class, AlluxioConfiguration.class, InetSocketAddress.class})
+              .newInstance(mParentSubject, mConfiguration, serverAddress.getSocketAddress());
         } catch (ReflectiveOperationException e) {
           throw new IllegalStateException(
                   TxPropertyKey.SECURITY_AUTHENTICATION_CUSTOM_SASL_CLIENT_CLASS.getName()

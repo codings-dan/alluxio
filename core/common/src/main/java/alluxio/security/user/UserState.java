@@ -38,6 +38,8 @@ public interface UserState {
    */
   @SuppressFBWarnings(value = "MS_OOI_PKGPROTECT")
   ArrayList<UserStateFactory> FACTORIES = new ArrayList<>(Arrays.asList(
+      // All newly auth UserState factory should be added before Simple.
+      new TAuthUserState.Factory(),
       new SimpleUserState.Factory(),
       new NoopUserState.Factory()
   ));

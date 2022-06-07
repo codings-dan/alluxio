@@ -28,6 +28,7 @@ import javax.security.auth.Subject;
 import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslClient;
 import javax.security.sasl.SaslException;
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Set;
 
@@ -42,9 +43,11 @@ public class TbdsClientHandlerPlain extends AbstractSaslClientHandler {
    *
    * @param subject client subject
    * @param conf Alluxio configuration
+   * @param serverAddress Alluxio server address
    * @throws UnauthenticatedException excepiton
    */
-  public TbdsClientHandlerPlain(Subject subject, AlluxioConfiguration conf)
+  public TbdsClientHandlerPlain(Subject subject, AlluxioConfiguration conf,
+      InetSocketAddress serverAddress)
       throws UnauthenticatedException {
     super(ChannelAuthenticationScheme.CUSTOM);
     if (subject == null) {

@@ -44,7 +44,7 @@ public class TbdsServerHandlerPlain extends AbstractSaslServerHandler {
    * @throws SaslException
    */
   public TbdsServerHandlerPlain(String serverName, AlluxioConfiguration conf,
-                          ImpersonationAuthenticator authenticator) throws SaslException {
+      ImpersonationAuthenticator authenticator) throws SaslException {
     if (!isInitialized()) {
       synchronized (TbdsServerHandlerPlain.class) {
         if (!isInitialized()) {
