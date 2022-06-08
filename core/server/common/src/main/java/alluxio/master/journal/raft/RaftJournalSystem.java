@@ -561,6 +561,7 @@ public class RaftJournalSystem extends AbstractJournalSystem {
       mRaftJournalWriter.close();
       mCanKeepState.set(mAsyncJournalWriter.get().isQueueEmpty()
           && !mRaftJournalWriter.haveJournalUnCommitted() && !mHaveTaskUnFinish.get());
+      mHaveTaskUnFinish.set(false);
     } catch (IOException e) {
       LOG.warn("Error closing journal writer: {}", e.toString());
     } finally {
