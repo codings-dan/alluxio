@@ -521,6 +521,18 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.SERVER)
           .build();
+  // The prefixes of OZONE and CHDFS are both "ofs://".
+  // If you need to use "ofs://" to access ozone,
+  // you should overwrite the configuration of PropertyKey UNDERFS_CHDFS_PREFIXES,
+  // and then configure PropertyKey UNDERFS_OZONE_PREFIXES to "ofs://"
+  public static final PropertyKey UNDERFS_OZONE_PREFIXES =
+      Builder.listBuilder(Name.UNDERFS_OZONE_PREFIXES)
+          .setDefaultValue("o3fs://")
+          .setDescription("Specify which prefixes should run through the Ozone implementation"
+              + " of UnderFileSystem. The delimiter is any whitespace and/or ','.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.SERVER)
+          .build();
 
   /**
    * A nested class to hold named string constants for their corresponding properties.
@@ -675,6 +687,7 @@ public final class TxPropertyKey {
         "alluxio.cos.qcloud.object.storage.ranger.service.config.dir";
     public static final String UNDERFS_COS_PREFIXES = "alluxio.underfs.cos.prefixes";
     public static final String UNDERFS_CHDFS_PREFIXES = "alluxio.underfs.chdfs.prefixes";
+    public static final String UNDERFS_OZONE_PREFIXES = "alluxio.underfs.ozone.prefixes";
 
     // ldap group mapping related properties
     public static final String SECURITY_GROUP_MAPPING_LDAP_URL =
