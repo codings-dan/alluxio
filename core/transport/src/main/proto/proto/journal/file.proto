@@ -172,6 +172,7 @@ message InodeDirectoryIdGeneratorEntry {
 enum PTtlAction {
   DELETE = 0;
   FREE = 1;
+  EVICT_META = 2000;
 }
 
 // next available id: 30

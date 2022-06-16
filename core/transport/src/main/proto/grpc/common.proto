@@ -93,6 +93,7 @@ message ConfigProperty {
 enum TtlAction {
   DELETE = 0; // Delete the file after TTL expires.
   FREE = 1;   // Free the file after TTL expires.
+  EVICT_META = 2000;   // Evict the file meta after TTL expires.
 }
 
 message Command {
