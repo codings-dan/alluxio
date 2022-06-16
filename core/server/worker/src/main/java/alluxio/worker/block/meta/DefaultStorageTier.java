@@ -15,6 +15,7 @@ import alluxio.Constants;
 import alluxio.WorkerStorageTierAssoc;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.exception.AlluxioException;
 import alluxio.exception.BlockAlreadyExistsException;
 import alluxio.exception.InvalidPathException;
 import alluxio.exception.PreconditionMessage;
@@ -30,13 +31,20 @@ import alluxio.util.io.PathUtils;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 
@@ -55,7 +63,7 @@ public final class DefaultStorageTier implements StorageTier {
   private final int mTierOrdinal;
   /** Total capacity of all StorageDirs in bytes. */
   private long mCapacityBytes;
-  private HashMap<Integer, StorageDir> mDirs;
+  private Map<Integer, StorageDir> mDirs;
   /** The lost storage paths that are failed to initialize or lost. */
   private List<String> mLostStorage;
 
@@ -65,7 +73,7 @@ public final class DefaultStorageTier implements StorageTier {
   }
 
   private void initStorageTier(boolean isMultiTier)
-      throws BlockAlreadyExistsException, IOException, WorkerOutOfSpaceException {
+      throws IOException, AlluxioException {
     String tmpDir = ServerConfiguration.getString(PropertyKey.WORKER_DATA_TMP_FOLDER);
     PropertyKey tierDirPathConf =
         PropertyKey.Template.WORKER_TIERED_STORE_LEVEL_DIRS_PATH.format(mTierOrdinal);
@@ -92,36 +100,39 @@ public final class DefaultStorageTier implements StorageTier {
           ServerConfiguration.getBytes(PropertyKey.WORKER_MANAGEMENT_TIER_ALIGN_RESERVED_BYTES);
     }
 
-    mDirs = new HashMap<>(dirPaths.size());
-    mLostStorage = new ArrayList<>();
+    mDirs = new ConcurrentHashMap<>(dirPaths.size());
+    mLostStorage = Collections.synchronizedList(new ArrayList<>());
 
-    long totalCapacity = 0;
+    AtomicLong totalCapacity = new AtomicLong(0);
+    List<AlluxioException> exceptions = Collections.synchronizedList(
+        new ArrayList<>());
+    ThreadPoolExecutor executor =
+        (ThreadPoolExecutor) Executors.newFixedThreadPool(dirPaths.size());
+    executor.setThreadFactory(
+        new ThreadFactoryBuilder().setNameFormat("init-storage-tier-thread-%d").build());
+    long startTime = CommonUtils.getCurrentMs();
     for (int i = 0; i < dirPaths.size(); i++) {
       int index = i >= dirQuotas.size() ? dirQuotas.size() - 1 : i;
-      int mediumTypeindex = i >= dirMedium.size() ? dirMedium.size() - 1 : i;
+      int mediumTypeIndex = i >= dirMedium.size() ? dirMedium.size() - 1 : i;
       long capacity = FormatUtils.parseSpaceSize(dirQuotas.get(index));
-      try {
-        StorageDir dir = DefaultStorageDir.newStorageDir(this, i, capacity, reservedBytes,
-            dirPaths.get(i), dirMedium.get(mediumTypeindex));
-        totalCapacity += capacity;
-        mDirs.put(i, dir);
-      } catch (IOException | InvalidPathException e) {
-        LOG.error("Unable to initialize storage directory at {}", dirPaths.get(i), e);
-        mLostStorage.add(dirPaths.get(i));
-        continue;
-      }
-
-      // Delete tmp directory.
-      String tmpDirPath = PathUtils.concatPath(dirPaths.get(i), tmpDir);
-      try {
-        FileUtils.deletePathRecursively(tmpDirPath);
-      } catch (IOException e) {
-        if (FileUtils.exists(tmpDirPath)) {
-          LOG.error("Failed to clean up temporary directory: {}.", tmpDirPath);
-        }
-      }
+      StorageScanner storageScanner = new StorageScanner(i, capacity, reservedBytes,
+          dirPaths.get(i), dirMedium.get(mediumTypeIndex), totalCapacity, exceptions, tmpDir);
+      executor.submit(storageScanner);
     }
-    mCapacityBytes = totalCapacity;
+    executor.shutdown();
+    try {
+      executor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      throw new IOException(e);
+    }
+
+    if (!exceptions.isEmpty()) {
+      throw exceptions.get(0);
+    }
+    mCapacityBytes = totalCapacity.get();
+    LOG.info("Completed init {} storage tiers, cost {}ms, total capacityBytes is {},"
+            + " storage dirs is {}",
+        dirPaths.size(), CommonUtils.getCurrentMs() - startTime, mCapacityBytes, mDirs);
     if (mTierAlias.equals(Constants.MEDIUM_MEM) && mDirs.size() == 1) {
       checkEnoughMemSpace(mDirs.values().iterator().next());
     }
@@ -185,11 +196,11 @@ public final class DefaultStorageTier implements StorageTier {
    * @param tierAlias the tier alias
    * @param isMultiTier whether this tier is part of a multi-tier setup
    * @return a new storage tier
-   * @throws BlockAlreadyExistsException if the tier already exists
-   * @throws WorkerOutOfSpaceException if there is not enough space available
+   * @throws IOException if any error occurs
+   * @throws AlluxioException if an Alluxio error is encountered
    */
   public static StorageTier newStorageTier(String tierAlias, boolean isMultiTier)
-      throws BlockAlreadyExistsException, IOException, WorkerOutOfSpaceException {
+      throws IOException, AlluxioException {
     DefaultStorageTier ret = new DefaultStorageTier(tierAlias);
     ret.initStorageTier(isMultiTier);
     return ret;
@@ -241,5 +252,71 @@ public final class DefaultStorageTier implements StorageTier {
       mCapacityBytes -=  dir.getCapacityBytes();
     }
     mLostStorage.add(dir.getDirPath());
+  }
+
+  class StorageScanner implements Runnable {
+    private int mDirIndex;
+    private long mCapacityBytes;
+    private long mReservedBytes;
+    private String mDirPath;
+    private String mDirMedium;
+    private AtomicLong mTotalCapacity;
+    private List<AlluxioException> mExceptions;
+    private String mTmpDirPath;
+
+    /**
+     * Construct a StorageScanner.
+     * @param dirIndex the index of this dir in its tier
+     * @param capacityBytes the initial capacity of this dir, can not be modified later
+     * @param reservedBytes the amount of reserved space for internal management
+     * @param dirPath filesystem path of this dir for actual storage
+     * @param dirMedium the medium type of the storage dir
+     * @param totalCapacity the total capacity
+     * @param exceptions the exception list
+     */
+    StorageScanner(int dirIndex, long capacityBytes,
+        long reservedBytes, String dirPath, String dirMedium, AtomicLong totalCapacity,
+        List<AlluxioException> exceptions, String tmpDirPath) {
+      mDirIndex = dirIndex;
+      mCapacityBytes = capacityBytes;
+      mReservedBytes = reservedBytes;
+      mDirPath = dirPath;
+      mDirMedium = dirMedium;
+      mTotalCapacity = totalCapacity;
+      mExceptions = exceptions;
+      mTmpDirPath = tmpDirPath;
+    }
+
+    @Override
+    public void run() {
+      long startTime = CommonUtils.getCurrentMs();
+      LOG.info("Start to initialize storage directory at {}", mDirPath);
+      try {
+        StorageDir dir = DefaultStorageDir.newStorageDir(DefaultStorageTier.this, mDirIndex,
+            mCapacityBytes, mReservedBytes, mDirPath, mDirMedium);
+        mTotalCapacity.addAndGet(mCapacityBytes);
+        mDirs.put(mDirIndex, dir);
+      } catch (IOException | InvalidPathException e) {
+        LOG.error("Unable to initialize storage directory at {}", mDirPath, e);
+        mLostStorage.add(mDirPath);
+        return;
+      } catch (BlockAlreadyExistsException | WorkerOutOfSpaceException e) {
+        LOG.error("Unable to initialize storage directory at {}",  mDirPath, e);
+        mExceptions.add(e);
+        return;
+      }
+
+      // Delete tmp directory.
+      String tmpDirPath = PathUtils.concatPath(mDirPath, mTmpDirPath);
+      try {
+        FileUtils.deletePathRecursively(tmpDirPath);
+      } catch (IOException e) {
+        if (FileUtils.exists(tmpDirPath)) {
+          LOG.error("Failed to clean up temporary directory: {}.", tmpDirPath);
+        }
+      }
+      LOG.info("Finished to initialize storage directory at {} in {} ms ",
+          mDirPath, CommonUtils.getCurrentMs() - startTime);
+    }
   }
 }
