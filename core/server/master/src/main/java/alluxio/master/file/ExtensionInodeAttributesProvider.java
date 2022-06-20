@@ -275,8 +275,9 @@ public final class ExtensionInodeAttributesProvider implements InodeAttributesPr
       Preconditions.checkArgument(alluxioURI.getScheme() != null,
           "convertToExternalUfsUri Scheme is null");
       LOG.debug("convertToExternalUfsNameSpace before {}", alluxioURI);
-
-      if (Constants.HEADER_OZONE.startsWith(alluxioURI.getScheme())) {
+      String ozonePrefixes =
+          ServerConfiguration.global().getString(TxPropertyKey.UNDERFS_OZONE_PREFIXES);
+      if (ozonePrefixes.startsWith(alluxioURI.getScheme())) {
         // o3fs://bucket.volume/key convert to o3fs://bucket.volume/volume/bucket/key.
         // o3fs://bucket.volume.tdw/key convert to o3fs://bucket.volume.tdw/volume/bucket/key.
         // o3fs://bucket.volume.1.1.1.1:9999/key convert to

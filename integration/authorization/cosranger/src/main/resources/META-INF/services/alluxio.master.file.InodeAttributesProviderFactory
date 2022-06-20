@@ -9,4 +9,5 @@
 # See the NOTICE file distributed with this work for information regarding copyright ownership.
 #
 
+alluxio.security.authorization.cosn.CosInodeAttributesProviderFactory
 alluxio.security.authorization.chdfs.ChdfsInodeAttributesProviderFactory

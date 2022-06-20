@@ -32,21 +32,21 @@ import javax.security.auth.login.Configuration;
  * modules to be used.
  */
 @ThreadSafe
-public final class LoginModuleConfiguration extends Configuration {
+public class LoginModuleConfiguration extends Configuration {
 
-  private static final Map<String, String> EMPTY_JAAS_OPTIONS = new HashMap<>();
+  static final Map<String, String> EMPTY_JAAS_OPTIONS = new HashMap<>();
 
   /** Login module that allows a user name provided by OS. */
-  private static final AppConfigurationEntry OS_SPECIFIC_LOGIN =
+  protected static final AppConfigurationEntry OS_SPECIFIC_LOGIN =
       new AppConfigurationEntry(LoginModuleConfigurationUtils.OS_LOGIN_MODULE_NAME,
           LoginModuleControlFlag.REQUIRED, EMPTY_JAAS_OPTIONS);
 
   /** Login module that allows a user name provided by application to be specified. */
-  private static final AppConfigurationEntry APP_LOGIN = new AppConfigurationEntry(
+  protected static final AppConfigurationEntry APP_LOGIN = new AppConfigurationEntry(
       AppLoginModule.class.getName(), LoginModuleControlFlag.SUFFICIENT, EMPTY_JAAS_OPTIONS);
 
   /** Login module that allows a user name provided by an Alluxio specific login module. */
-  private static final AppConfigurationEntry ALLUXIO_LOGIN = new AppConfigurationEntry(
+  protected static final AppConfigurationEntry ALLUXIO_LOGIN = new AppConfigurationEntry(
       AlluxioLoginModule.class.getName(), LoginModuleControlFlag.REQUIRED, EMPTY_JAAS_OPTIONS);
 
   /**

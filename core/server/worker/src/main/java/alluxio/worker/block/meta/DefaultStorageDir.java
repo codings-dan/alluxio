@@ -402,4 +402,15 @@ public final class DefaultStorageDir implements StorageDir {
       mCommittedBytes.addAndGet(size);
     }
   }
+
+  @Override
+  public String toString() {
+    return "DefaultStorageDir{" + "mCapacityBytes=" + mCapacityBytes + ", mDirMedium='" + mDirMedium
+        + '\'' + ", mBlockIdToBlockMap.size=" + mBlockIdToBlockMap.size()
+        + ", mBlockIdToTempBlockMap.size=" + mBlockIdToTempBlockMap
+        + ", mSessionIdToTempBlockIdsMap.size=" + mSessionIdToTempBlockIdsMap.size()
+        + ", mAvailableBytes=" + mAvailableBytes + ", mCommittedBytes=" + mCommittedBytes
+        + ", mReservedBytes=" + mReservedBytes + ", mDirPath='" + mDirPath + '\'' + ", mDirIndex="
+        + mDirIndex + ", mTier=" + mTier + '}';
+  }
 }

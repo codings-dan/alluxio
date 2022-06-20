@@ -25,6 +25,7 @@
   <modules>
     <module>client</module>
     <module>hadoop</module>
+    <module>cosn</module>
   </modules>
 
   <properties>

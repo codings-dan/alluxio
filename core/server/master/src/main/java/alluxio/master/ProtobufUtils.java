@@ -39,6 +39,8 @@ public final class ProtobufUtils {
         return TtlAction.DELETE;
       case FREE:
         return TtlAction.FREE;
+      case EVICT_META:
+        return TtlAction.EVICT_META;
       default:
         throw new IllegalStateException("Unknown protobuf ttl action: " + pTtlAction);
     }
@@ -59,6 +61,8 @@ public final class ProtobufUtils {
         return PTtlAction.DELETE;
       case FREE:
         return PTtlAction.FREE;
+      case EVICT_META:
+        return PTtlAction.EVICT_META;
       default:
         throw new IllegalStateException("Unknown ttl action: " + ttlAction);
     }

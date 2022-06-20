@@ -11,7 +11,6 @@
 
 package alluxio.security.authorization.hadoop;
 
-import alluxio.Constants;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
 import alluxio.conf.TxPropertyKey;
@@ -45,11 +44,13 @@ public final class HdfsInodeAttributesProviderFactory implements InodeAttributes
   public boolean supportsPath(String path, @Nullable UnderFileSystemConfiguration conf) {
     boolean isHdfs = ServerConfiguration.getList(alluxio.conf.PropertyKey.UNDERFS_HDFS_PREFIXES)
         .stream().anyMatch(path::startsWith);
+    String ozonePrefixes =
+        ServerConfiguration.global().getString(TxPropertyKey.UNDERFS_OZONE_PREFIXES);
     boolean allowCompatibleOzone = conf != null
         && conf.isSet(TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED)
         && conf.getBoolean(
             TxPropertyKey.SECURITY_AUTHORIZATION_PLUGIN_HDFS_COMPATIBLE_OZONE_ENABLED);
-    boolean isOzone = path.startsWith(Constants.HEADER_OZONE);
+    boolean isOzone = path.startsWith(ozonePrefixes);
 
     if (isHdfs) {
       List<String> prefixList = ServerConfiguration.getList(PropertyKey.UNDERFS_HDFS_PREFIXES);

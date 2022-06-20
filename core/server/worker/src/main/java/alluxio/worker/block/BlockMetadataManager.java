@@ -15,6 +15,7 @@ import alluxio.StorageTierAssoc;
 import alluxio.WorkerStorageTierAssoc;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.exception.AlluxioException;
 import alluxio.exception.BlockAlreadyExistsException;
 import alluxio.exception.BlockDoesNotExistException;
 import alluxio.exception.ExceptionMessage;
@@ -119,7 +120,7 @@ public final class BlockMetadataManager {
         // Create default block iterator
         mBlockIterator = new DefaultBlockIterator(this, BlockAnnotator.Factory.create());
       }
-    } catch (BlockAlreadyExistsException | IOException | WorkerOutOfSpaceException e) {
+    } catch (IOException | AlluxioException e) {
       throw new RuntimeException(e);
     }
   }

@@ -111,6 +111,18 @@ final class InodeTtlChecker implements HeartbeatExecutor {
                   mFileSystemMaster.delete(path, DeleteContext.defaults());
                 }
                 break;
+              case EVICT_META:
+                // Delete the inode and reset the directChildrenLoadedState of its parent.
+                if (inode.isDirectory()) {
+                  mFileSystemMaster.delete(path,
+                      DeleteContext.mergeFrom(DeletePOptions.newBuilder().setRecursive(true)
+                          .setAlluxioOnly(true).setResetDirectChildrenLoadedState(true)));
+                } else {
+                  mFileSystemMaster.delete(path,
+                      DeleteContext.mergeFrom(DeletePOptions.newBuilder()
+                          .setAlluxioOnly(true).setResetDirectChildrenLoadedState(true)));
+                }
+                break;
               default:
                 LOG.error("Unknown ttl action {}", ttlAction);
             }

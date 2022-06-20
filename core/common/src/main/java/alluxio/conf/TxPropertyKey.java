@@ -125,8 +125,14 @@ public final class TxPropertyKey {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
+  public static final PropertyKey WEB_UI_USE_CLIENT_FS_ENABLED =
+      Builder.booleanBuilder(Name.WEB_UI_USE_CLIENT_FS_ENABLED)
+          .setDescription("Whether to use client file system in web server.")
+          .setDefaultValue(true)
+          .setScope(Scope.MASTER)
+          .build();
   public static final PropertyKey MASTER_CAN_KEEP_STATE =
-      Builder.intBuilder(Name.MASTER_CAN_KEEP_STATE)
+      Builder.booleanBuilder(Name.MASTER_CAN_KEEP_STATE)
           .setDescription("Weather enable master can keep state when lose primacy")
           .setDefaultValue(false)
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
@@ -549,8 +555,6 @@ public final class TxPropertyKey {
     public static final String MASTER_METASTORE_BLOCK = "alluxio.master.metastore.block";
     public static final String MASTER_IN_ALLUXIO_DATA_PAGE_COUNT =
         "alluxio.master.in.alluxio.data.page.count";
-    public static final String MASTER_CAN_KEEP_STATE =
-        "alluxio.master.can.keep.state";
 
     public static final String MASTER_JOURNAL_ASYNC_NOTIFY =
         "alluxio.master.journal.async.notify";

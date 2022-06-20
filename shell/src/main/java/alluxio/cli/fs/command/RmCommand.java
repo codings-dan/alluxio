@@ -63,6 +63,13 @@ public final class RmCommand extends AbstractFileSystemCommand {
           .hasArg(false)
           .desc("remove data and metadata from Alluxio space only")
           .build();
+  private static final Option RESET_DIRECT_CHILDREN_LOADED_STATE =
+      Option.builder()
+          .longOpt("resetDirectChildrenLoadState")
+          .required(false)
+          .hasArg(false)
+          .desc("reset data and metadata from Alluxio space only")
+          .build();
 
   /**
    * @param fsContext the filesystem of Alluxio
@@ -82,7 +89,8 @@ public final class RmCommand extends AbstractFileSystemCommand {
         .addOption(RECURSIVE_OPTION)
         .addOption(RECURSIVE_ALIAS_OPTION)
         .addOption(REMOVE_UNCHECKED_OPTION)
-        .addOption(REMOVE_ALLUXIO_ONLY);
+        .addOption(REMOVE_ALLUXIO_ONLY)
+        .addOption(RESET_DIRECT_CHILDREN_LOADED_STATE);
   }
 
   @Override
@@ -101,7 +109,10 @@ public final class RmCommand extends AbstractFileSystemCommand {
     boolean isAlluxioOnly = cl.hasOption(REMOVE_ALLUXIO_ONLY.getLongOpt());
     DeletePOptions options =
         DeletePOptions.newBuilder().setRecursive(recursive).setAlluxioOnly(isAlluxioOnly)
-            .setUnchecked(cl.hasOption(REMOVE_UNCHECKED_OPTION_CHAR)).build();
+            .setUnchecked(cl.hasOption(REMOVE_UNCHECKED_OPTION_CHAR))
+            .setResetDirectChildrenLoadedState(
+                cl.hasOption(RESET_DIRECT_CHILDREN_LOADED_STATE.getLongOpt()))
+            .build();
 
     mFileSystem.delete(path, options);
     if (!isAlluxioOnly) {

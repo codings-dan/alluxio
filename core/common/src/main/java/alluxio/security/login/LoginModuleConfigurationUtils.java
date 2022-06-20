@@ -14,6 +14,7 @@ package alluxio.security.login;
 import alluxio.util.OSUtils;
 
 import javax.annotation.concurrent.ThreadSafe;
+import java.security.Principal;
 
 /**
  * This class provides constants used in JAAS login.
@@ -24,12 +25,15 @@ public final class LoginModuleConfigurationUtils {
   public static final String OS_LOGIN_MODULE_NAME;
   /** Class name of Principal according to different OS type. */
   public static final String OS_PRINCIPAL_CLASS_NAME;
+  /** Class of Principal according to different OS type. */
+  public static final Class<? extends Principal> OS_PRINCIPAL_CLASS;
 
   private LoginModuleConfigurationUtils() {} // prevent instantiation
 
   static {
     OS_LOGIN_MODULE_NAME = getOSLoginModuleName();
     OS_PRINCIPAL_CLASS_NAME = getOSPrincipalClassName();
+    OS_PRINCIPAL_CLASS = getOsPrincipalClass();
   }
 
   /**
@@ -74,5 +78,26 @@ public final class LoginModuleConfigurationUtils {
           : "com.sun.security.auth.UnixPrincipal";
     }
     return principalClassName;
+  }
+
+  /* Return the OS principal class */
+  private static Class<? extends Principal> getOsPrincipalClass() {
+    // load the principal class
+    ClassLoader loader = Thread.currentThread().getContextClassLoader();
+    if (loader == null) {
+      loader = ClassLoader.getSystemClassLoader();
+    }
+
+    Class<? extends Principal> clazz;
+    try {
+      // Declare a temp variable so that we can suppress warnings locally
+      @SuppressWarnings("unchecked")
+      Class<? extends Principal> tmpClazz =
+          (Class<? extends Principal>) loader.loadClass(OS_PRINCIPAL_CLASS_NAME);
+      clazz = tmpClazz;
+      return clazz;
+    } catch (ClassNotFoundException e) {
+      return null;
+    }
   }
 }

@@ -15,6 +15,7 @@ import alluxio.Constants;
 import alluxio.client.file.FileSystem;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.master.AlluxioMasterProcess;
 import alluxio.util.io.PathUtils;
 
@@ -62,7 +63,11 @@ public final class MasterWebServer extends WebServer {
     ResourceConfig config = new ResourceConfig()
         .packages("alluxio.master", "alluxio.master.block", "alluxio.master.file")
         .register(JacksonProtobufObjectMapperProvider.class);
-    mFileSystem = FileSystem.Factory.create(ServerConfiguration.global());
+    if (ServerConfiguration.getBoolean(TxPropertyKey.WEB_UI_USE_CLIENT_FS_ENABLED)) {
+      mFileSystem = FileSystem.Factory.create(ServerConfiguration.global());
+    } else {
+      mFileSystem = null;
+    }
     // Override the init method to inject a reference to AlluxioMaster into the servlet context.
     // ServletContext may not be modified until after super.init() is called.
     ServletContainer servlet = new ServletContainer(config) {
@@ -103,7 +108,9 @@ public final class MasterWebServer extends WebServer {
 
   @Override
   public void stop() throws Exception {
-    mFileSystem.close();
+    if (mFileSystem != null) {
+      mFileSystem.close();
+    }
     super.stop();
   }
 }

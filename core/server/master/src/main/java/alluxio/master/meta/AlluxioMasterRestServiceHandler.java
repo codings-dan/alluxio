@@ -26,6 +26,7 @@ import alluxio.client.file.URIStatus;
 import alluxio.conf.ConfigurationValueOptions;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.AccessControlException;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.FileDoesNotExistException;
@@ -446,33 +447,38 @@ public final class AlluxioMasterRestServiceHandler {
             AlluxioURI absolutePath = new AlluxioURI(currentFileInfo.getAbsolutePath());
             FileSystem fs = mFsClient;
             String fileData;
-            URIStatus status = fs.getStatus(absolutePath);
-            if (status.isCompleted()) {
-              OpenFilePOptions options =
-                  OpenFilePOptions.newBuilder().setReadType(ReadPType.NO_CACHE).build();
-              try (FileInStream is = fs.openFile(absolutePath, options)) {
-                int len = (int) Math.min(5L * Constants.KB, status.getLength() - offset);
-                byte[] data = new byte[len];
-                long skipped = is.skip(offset);
-                if (skipped < 0) {
-                  // nothing was skipped
-                  fileData = "Unable to traverse to offset; is file empty?";
-                } else if (skipped < offset) {
-                  // couldn't skip all the way to offset
-                  fileData = "Unable to traverse to offset; is offset larger than the file?";
-                } else {
-                  // read may not read up to len, so only convert what was read
-                  int read = is.read(data, 0, len);
-                  if (read < 0) {
-                    // stream couldn't read anything, skip went to EOF?
-                    fileData = "Unable to read file";
+            if (fs != null) {
+              URIStatus status = fs.getStatus(absolutePath);
+              if (status.isCompleted()) {
+                OpenFilePOptions options =
+                    OpenFilePOptions.newBuilder().setReadType(ReadPType.NO_CACHE).build();
+                try (FileInStream is = fs.openFile(absolutePath, options)) {
+                  int len = (int) Math.min(5L * Constants.KB, status.getLength() - offset);
+                  byte[] data = new byte[len];
+                  long skipped = is.skip(offset);
+                  if (skipped < 0) {
+                    // nothing was skipped
+                    fileData = "Unable to traverse to offset; is file empty?";
+                  } else if (skipped < offset) {
+                    // couldn't skip all the way to offset
+                    fileData = "Unable to traverse to offset; is offset larger than the file?";
                   } else {
-                    fileData = WebUtils.convertByteArrayToStringWithoutEscape(data, 0, read);
+                    // read may not read up to len, so only convert what was read
+                    int read = is.read(data, 0, len);
+                    if (read < 0) {
+                      // stream couldn't read anything, skip went to EOF?
+                      fileData = "Unable to read file";
+                    } else {
+                      fileData = WebUtils.convertByteArrayToStringWithoutEscape(data, 0, read);
+                    }
                   }
                 }
+              } else {
+                fileData = "The requested file is not complete yet.";
               }
             } else {
-              fileData = "The requested file is not complete yet.";
+              fileData = "NOTICE: If you want to get the content, please enable "
+                  + TxPropertyKey.WEB_UI_USE_CLIENT_FS_ENABLED.getName();
             }
             List<UIFileBlockInfo> uiBlockInfo = new ArrayList<>();
             for (FileBlockInfo fileBlockInfo : mFileSystemMaster
