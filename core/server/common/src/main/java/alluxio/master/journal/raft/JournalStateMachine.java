@@ -16,6 +16,7 @@ import alluxio.ProcessUtils;
 import alluxio.annotation.SuppressFBWarnings;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
+import alluxio.conf.TxPropertyKey;
 import alluxio.exception.status.UnavailableException;
 import alluxio.grpc.AddQuorumServerRequest;
 import alluxio.grpc.JournalQueryRequest;
@@ -152,7 +153,10 @@ public class JournalStateMachine extends BaseStateMachine {
     mJournals = journals;
     mJournalApplier = new BufferedJournalApplier(journals,
         () -> journalSystem.getJournalSinks(null));
-    if (!journalSystem.canKeepState()) {
+    if (journalSystem.canKeepState() &&
+        ServerConfiguration.getBoolean(TxPropertyKey.MASTER_CAN_KEEP_STATE)) {
+      LOG.info("Since the journal has not changed, the state is no longer reset.");
+    } else {
       resetState();
     }
     journalSystem.resetCanKeepState();
